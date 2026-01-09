@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # reGen API Server
+  regen-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: regen-api
+    restart: unless-stopped
+    ports:
+      - "8000:8080"
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - APP_ENV=prod
+      - PORT=8080
+    volumes:
+      # Mount alembic for migrations
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+      # Mount .env file (read-only)
+      - ./.env:/app/.env:ro
+      # Mount frontend directory for development (writable for npm install & build)
+      - ./frontend:/app/frontend
+      - ./scripts:/app/scripts
+    depends_on:
+      - redis
+    networks:
+      - regen-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis (for caching and background tasks)
+  redis:
+    image: redis:7-alpine
+    container_name: regen-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - regen-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  regen-network:
+    driver: bridge
+
+volumes:
+  redis_data:

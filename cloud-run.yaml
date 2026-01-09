@@ -1,0 +1,112 @@
+# Cloud Run service configuration
+# This file defines the service configuration for Google Cloud Run
+# Deploy using: gcloud run services replace cloud-run.yaml
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: regen-server
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # Auto-scaling configuration
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '10'
+        
+        # Resource allocation
+        run.googleapis.com/cpu-throttling: 'true'
+        run.googleapis.com/startup-cpu-boost: 'true'
+        
+        # VPC connector (if needed for database access)
+        # run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/REGION/connectors/CONNECTOR_NAME
+        # run.googleapis.com/vpc-access-egress: private-ranges-only
+        
+        # Cloud SQL connection (if using Cloud SQL)
+        # run.googleapis.com/cloudsql-instances: PROJECT_ID:REGION:INSTANCE_NAME
+        
+    spec:
+      # Service account for the Cloud Run service
+      # serviceAccountName: SERVICE_ACCOUNT_EMAIL
+      
+      # Container timeout (max 3600 seconds)
+      # Set to 3600 for WebSocket support (voice conversations up to 30 minutes)
+      timeoutSeconds: 3600
+      
+      # Container configuration
+      # BALANCED: Supports WebSocket connections while preventing DB exhaustion
+      # - WebSocket connections are long-lived but don't constantly hit DB
+      # - NullPool creates fresh DB connection only when needed
+      # - 40 concurrent = good balance between WebSocket capacity and DB stability
+      # - Cloud Run auto-scales (maxScale: 10) if more capacity needed
+      containerConcurrency: 40
+      
+      containers:
+      - name: regen-server
+        # Image will be set during deployment
+        image: gcr.io/PROJECT_ID/regen-server:latest
+        
+        ports:
+        - name: http1
+          containerPort: 8080
+        
+        # Resource limits
+        resources:
+          limits:
+            cpu: '1000m'
+            memory: 1Gi
+        
+        # Environment variables
+        env:
+        - name: APP_ENV
+          value: 'prod'
+        - name: PORT
+          value: '8080'
+        
+        # Secrets (recommended for sensitive data)
+        # - name: DATABASE_URL
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: database-url
+        #       key: latest
+        # - name: JWT_SECRET
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: jwt-secret
+        #       key: latest
+        # - name: GOOGLE_GENAI_API_KEY
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: google-genai-api-key
+        #       key: latest
+        
+        # Startup probe
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 3
+          successThreshold: 1
+          failureThreshold: 20
+        
+        # Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+  
+  traffic:
+  - percent: 100
+    latestRevision: true
