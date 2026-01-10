@@ -14,7 +14,7 @@ if [ -d "/app/frontend" ] && [ -f "/app/frontend/package.json" ]; then
     fi
     
     echo "🔨 Building React frontend..."
-    npm run build
+    npm run build 
     
     cd /app
     echo "✅ Frontend build complete!"

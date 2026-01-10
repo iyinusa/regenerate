@@ -12,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import os
 
-# Import routers (will be created later)
-# from app.api.routes import api_router
+# Import routers
+from app.api.routes import api_router
 
 # Create FastAPI application
 app = FastAPI(
@@ -32,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routes
+app.include_router(api_router)
 
 # Mount static files for frontend
 frontend_path = Path(__file__).parent.parent / "frontend"
@@ -74,8 +77,8 @@ async def test_endpoint():
     """Test API endpoint"""
     return {"message": "reGen API is working!", "version": "0.1.0"}
 
-# Add API router when ready
-# app.include_router(api_router, prefix="/api/v1")
+# Add API router
+app.include_router(api_router)
 
 # Serve frontend
 @app.get("/", response_class=HTMLResponse)

@@ -104,21 +104,44 @@ case $deploy_choice in
         print_info "Building Docker image..."
         IMAGE_NAME="$REGION-docker.pkg.dev/$PROJECT_ID/regen-repo/regen-app"
         
+        # Enable required APIs
+        print_info "Enabling required APIs..."
+        gcloud services enable artifactregistry.googleapis.com --quiet
+        gcloud services enable run.googleapis.com --quiet
+        gcloud services enable cloudbuild.googleapis.com --quiet
+        
         # Create Artifact Registry repository if it doesn't exist
         print_info "Ensuring Artifact Registry repository exists..."
-        gcloud artifacts repositories describe regen-repo --location="$REGION" >/dev/null 2>&1 || \
-        gcloud artifacts repositories create regen-repo --repository-format=docker --location="$REGION" --description="reGen application repository"
+        if ! gcloud artifacts repositories describe regen-repo --location="$REGION" >/dev/null 2>&1; then
+            print_info "Creating Artifact Registry repository..."
+            gcloud artifacts repositories create regen-repo \
+                --repository-format=docker \
+                --location="$REGION" \
+                --description="reGen application repository" \
+                --quiet
+        else
+            print_info "Artifact Registry repository already exists"
+        fi
         
         # Configure Docker for Artifact Registry
         print_info "Configuring Docker for Artifact Registry..."
-        gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+        if ! gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet; then
+            print_error "Failed to configure Docker authentication"
+            exit 1
+        fi
         
         # Build the image for linux/amd64 platform (required for Cloud Run, especially on Mac M1/M2)
         print_info "Building for linux/amd64 platform (Cloud Run compatible)..."
-        docker build --platform linux/amd64 -t "$IMAGE_NAME" .
+        if ! docker build --platform linux/amd64 -t "$IMAGE_NAME" .; then
+            print_error "Docker build failed"
+            exit 1
+        fi
         
         print_info "Pushing image to Artifact Registry..."
-        docker push "$IMAGE_NAME"
+        if ! docker push "$IMAGE_NAME"; then
+            print_error "Failed to push image to Artifact Registry"
+            exit 1
+        fi
         
         print_info "Deploying to Cloud Run..."
         gcloud run deploy "$SERVICE_NAME" \

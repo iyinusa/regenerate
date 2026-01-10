@@ -140,7 +140,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
           </h1>
           
           <p ref={subtitleRef} className="hero-subtitle">
-            Traditional resumes are fading. We use <span className="highlight">Gemini 3</span> to distill your entire professional footprint into an immersive cinematic experience. Your work deserves more than bullet points.
+            Traditional resumes are fading. We use <span className="highlight">State-of-the-art AI</span> to distill your entire professional footprint into an immersive cinematic experience. Your work deserves more than bullet points.
           </p>
 
           <div ref={ctaRef} className="cta-section">
