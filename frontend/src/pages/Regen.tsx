@@ -41,7 +41,7 @@ const Regen: React.FC = () => {
   const navigate = useNavigate();
   
   const [url, setUrl] = useState('');
-  const [jobId, setJobId] = useState('');
+  const [, setJobId] = useState('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [overallProgress, setOverallProgress] = useState(0);
@@ -50,7 +50,8 @@ const Regen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
 
   // Default task structure (shown before WebSocket updates)
   const defaultTasks: Task[] = [
@@ -130,52 +131,65 @@ const Regen: React.FC = () => {
 
   // Connect to WebSocket for real-time updates
   const connectWebSocket = useCallback((jobId: string) => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = import.meta.env.VITE_API_URL 
-      ? new URL(import.meta.env.VITE_API_URL).host 
-      : window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/ws/tasks/${jobId}`;
+    // Use the apiClient's WebSocket URL helper for consistent URL construction
+    const wsUrl = apiClient.getWebSocketUrl(jobId);
+    console.log('Connecting to WebSocket:', wsUrl);
     
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setStatusMessage('Connected to task stream...');
+        setError(null); // Clear any previous errors
+        
+        // Send a ping to verify connection
+        ws.send('ping');
       };
 
       ws.onmessage = (event) => {
         try {
+          // Handle pong responses
+          if (event.data === 'pong') {
+            console.log('WebSocket ping-pong successful');
+            return;
+          }
+          
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('WebSocket message received:', message);
           handleWebSocketMessage(message);
         } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
+          console.error('Failed to parse WebSocket message:', e, 'Raw data:', event.data);
         }
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
         
-        // Attempt reconnection after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (jobId) {
+        // Only attempt reconnection if the close was not intentional
+        if (event.code !== 1000 && jobId) {
+          setStatusMessage('Connection lost, attempting to reconnect...');
+          // Attempt reconnection after 3 seconds
+          reconnectTimeoutRef.current = setTimeout(() => {
             connectWebSocket(jobId);
-          }
-        }, 3000);
+          }, 3000);
+        }
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         setIsConnected(false);
+        setError('WebSocket connection failed');
         // Fall back to polling
         startPolling(jobId);
       };
 
     } catch (e) {
-      console.error('Failed to connect WebSocket:', e);
+      console.error('Failed to create WebSocket connection:', e);
+      setError('Failed to establish real-time connection');
       // Fall back to polling
       startPolling(jobId);
     }
@@ -255,7 +269,12 @@ const Regen: React.FC = () => {
         setOverallProgress(100);
         setStatusMessage('Story generation complete!');
         setTimeout(() => {
-          navigate(`/journey?jobId=${message.job_id}`);
+          const guestId = localStorage.getItem('rg_guest_id');
+          if (guestId) {
+            navigate(`/journey/${guestId}`);
+          } else {
+            navigate(`/journey?jobId=${message.job_id}`);
+          }
         }, 2000);
         break;
 
@@ -299,7 +318,12 @@ const Regen: React.FC = () => {
         if (status.status === 'completed') {
           setOverallProgress(100);
           setTimeout(() => {
-            navigate(`/journey?jobId=${jobId}`);
+            const guestId = localStorage.getItem('rg_guest_id');
+            if (guestId) {
+              navigate(`/journey/${guestId}`);
+            } else {
+              navigate(`/journey?jobId=${jobId}`);
+            }
           }, 2000);
           return;
         } else if (status.status === 'failed') {
@@ -309,7 +333,7 @@ const Regen: React.FC = () => {
 
         attempts++;
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000);
+          pollTimeoutRef.current = setTimeout(poll, 2000) as any;
         } else {
           setError('Processing timeout. Please try again.');
         }
@@ -317,7 +341,7 @@ const Regen: React.FC = () => {
         console.error('Polling error:', err);
         attempts++;
         if (attempts < maxAttempts) {
-          setTimeout(poll, 3000);
+          pollTimeoutRef.current = setTimeout(poll, 3000) as any;
         }
       }
     };
@@ -346,6 +370,9 @@ const Regen: React.FC = () => {
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
       }
     };
   }, [searchParams, connectWebSocket]);

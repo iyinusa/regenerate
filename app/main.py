@@ -31,6 +31,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # WebSocket support
+    allow_origin_regex=r"https?://.*",
 )
 
 # Include API routes
@@ -76,9 +78,6 @@ async def favicon():
 async def test_endpoint():
     """Test API endpoint"""
     return {"message": "reGen API is working!", "version": "0.1.0"}
-
-# Add API router
-app.include_router(api_router)
 
 # Serve frontend
 @app.get("/", response_class=HTMLResponse)

@@ -413,17 +413,46 @@ class TaskOrchestrator:
         task.message = "Extracting structured data..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        response = await asyncio.to_thread(
-            self.genai_client.models.generate_content,
-            model="gemini-3-pro-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[{"url_context": {}}, {"google_search": {}}],
-                response_mime_type="application/json",
-                response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                thinking_config=types.ThinkingConfig(thinking_level="high")
+        # Try with thinking config first, fall back without if not supported
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-pro-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"url_context": {}}, {"google_search": {}}],
+                    response_mime_type="application/json",
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                )
             )
-        )
+        except Exception as e:
+            if "thinking level" in str(e).lower() or "thinking" in str(e).lower():
+                logger.warning(f"Thinking config not supported for profile extraction: {str(e)}, retrying without thinking config")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-pro-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"url_context": {}}, {"google_search": {}}],
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                    )
+                )
+            elif "model" in str(e).lower() and "not found" in str(e).lower():
+                logger.warning(f"Model not found, falling back to gemini-1.5-pro-latest: {str(e)}")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-1.5-pro-latest",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"url_context": {}}, {"google_search": {}}],
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                    )
+                )
+            else:
+                raise
         
         task.progress = 80
         task.message = "Processing response..."
@@ -442,7 +471,9 @@ class TaskOrchestrator:
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Get profile data from previous task
-        profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value, {})
+        profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value)
+        if not profile_data or not isinstance(profile_data, dict):
+            profile_data = {}
         
         # Check for additional URLs to enrich from
         additional_urls = []
@@ -475,7 +506,12 @@ class TaskOrchestrator:
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Get enriched profile data from previous task
-        profile_data = plan.result_data.get(TaskType.ENRICH_PROFILE.value, {})
+        profile_data = plan.result_data.get(TaskType.ENRICH_PROFILE.value)
+        if not profile_data or not isinstance(profile_data, dict):
+            profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value)
+            
+        if not profile_data or not isinstance(profile_data, dict):
+            profile_data = {}
         
         # Get guest_user_id and current history_id from plan options
         guest_user_id = plan.options.get('guest_user_id')
@@ -525,6 +561,15 @@ class TaskOrchestrator:
                 if not histories or len(histories) == 0:
                     # No previous history found, this is the first record
                     task.message = "First profile record for this user"
+                    
+                    # Update the current history record even for first record to ensure persistence
+                    if current_history_id:
+                        current_history = await db.get(ProfileHistory, current_history_id)
+                        if current_history:
+                            current_history.structured_data = profile_data
+                            await db.commit()
+                            logger.info(f"Saved initial profile data to history record {current_history_id}")
+                    
                     task.progress = 100
                     await self._broadcast_update(job_id, "task_progress", task.to_dict())
                     return {**profile_data, "history_checked": True, "aggregated": False, "first_record": True}
@@ -556,15 +601,40 @@ class TaskOrchestrator:
                 task.message = "Processing aggregation with Gemini 3 Flash..."
                 await self._broadcast_update(job_id, "task_progress", task.to_dict())
                 
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=aggregation_prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        thinking_config=types.ThinkingConfig(thinking_level="medium")
+                # Try with thinking config first, fall back without if failed
+                try:
+                    response = await asyncio.to_thread(
+                        self.genai_client.models.generate_content,
+                        model="gemini-3-pro-preview",
+                        contents=aggregation_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            thinking_config=types.ThinkingConfig(thinking_level="high")
+                        )
                     )
-                )
+                except Exception as e:
+                    if "thinking level" in str(e).lower() or "thinking" in str(e).lower():
+                        logger.warning(f"Thinking config not supported for aggregation: {str(e)}, retrying without thinking config")
+                        response = await asyncio.to_thread(
+                            self.genai_client.models.generate_content,
+                            model="gemini-3-flash-preview",
+                            contents=aggregation_prompt,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json"
+                            )
+                        )
+                    elif "model" in str(e).lower() and "not found" in str(e).lower():
+                        logger.warning(f"Model not found, falling back to gemini-2.5-flash: {str(e)}")
+                        response = await asyncio.to_thread(
+                            self.genai_client.models.generate_content,
+                            model="gemini-2.5-flash",
+                            contents=aggregation_prompt,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json"
+                            )
+                        )
+                    else:
+                        raise
                 
                 aggregated_data = self._parse_json_response(response.text)
                 
@@ -605,23 +675,61 @@ class TaskOrchestrator:
         if not self.genai_client:
             raise Exception("Gemini client not initialized")
         
-        profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value, {})
+        # Get profile data from aggregate_history, enrich_profile, or fetch_profile tasks
+        profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value)
+        if not profile_data:
+            profile_data = plan.result_data.get(TaskType.ENRICH_PROFILE.value)
+        if not profile_data:
+            profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value)
+        
+        # Ensure profile_data is a dict even if it was None in result_data
+        if profile_data is None:
+            profile_data = {}
+            
+        # Debug logging
+        logger.info(f"Structure journey task - Available result data keys: {list(plan.result_data.keys())}")
+        logger.info(f"Profile data type: {type(profile_data)}, keys: {list(profile_data.keys()) if isinstance(profile_data, dict) else 'Not a dict'}")
+        
+        # Validate profile data exists and has required structure
+        if not profile_data or not isinstance(profile_data, dict):
+            raise Exception(f"No valid profile data available for journey structuring. Available data keys: {list(plan.result_data.keys())}")
+        
+        # Check if profile has meaningful content
+        if not any(profile_data.get(key) for key in ['name', 'title', 'experiences', 'skills', 'bio']):
+            raise Exception("Profile data lacks sufficient content for journey structuring")
+        
         prompt = get_journey_structuring_prompt(profile_data)
         
         task.progress = 50
         task.message = "Generating journey chapters..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        response = await asyncio.to_thread(
-            self.genai_client.models.generate_content,
-            model="gemini-3-pro-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
-                thinking_config=types.ThinkingConfig(thinking_level="medium")
+        # Try with thinking config first, fall back without if not supported
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-pro-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                )
             )
-        )
+        except Exception as e:
+            if "thinking level" in str(e).lower():
+                logger.warning("Thinking config not supported, retrying without thinking config")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-pro-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=JOURNEY_STRUCTURE_SCHEMA
+                    )
+                )
+            else:
+                raise
         
         task.progress = 80
         task.message = "Finalizing journey structure..."
@@ -645,16 +753,32 @@ class TaskOrchestrator:
         task.message = "Generating timeline events..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        response = await asyncio.to_thread(
-            self.genai_client.models.generate_content,
-            model="gemini-3-pro-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=TIMELINE_SCHEMA,
-                thinking_config=types.ThinkingConfig(thinking_level="low")
+        # Try with thinking config first, fall back without if not supported
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-pro-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_json_schema=TIMELINE_SCHEMA,
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                )
             )
-        )
+        except Exception as e:
+            if "thinking level" in str(e).lower():
+                logger.warning("Thinking config not supported for timeline, retrying without thinking config")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-pro-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=TIMELINE_SCHEMA
+                    )
+                )
+            else:
+                raise
         
         return self._parse_json_response(response.text)
     
@@ -675,16 +799,32 @@ class TaskOrchestrator:
         task.message = "Writing video segments..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        response = await asyncio.to_thread(
-            self.genai_client.models.generate_content,
-            model="gemini-3-pro-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=DOCUMENTARY_SCHEMA,
-                thinking_config=types.ThinkingConfig(thinking_level="high")
+        # Try with thinking config first, fall back without if not supported
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-pro-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_json_schema=DOCUMENTARY_SCHEMA,
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                )
             )
-        )
+        except Exception as e:
+            if "thinking level" in str(e).lower():
+                logger.warning("Thinking config not supported for documentary, retrying without thinking config")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-pro-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=DOCUMENTARY_SCHEMA
+                    )
+                )
+            else:
+                raise
         
         task.progress = 80
         task.message = "Finalizing documentary structure..."
@@ -754,6 +894,10 @@ Ensure the output is comprehensive, accurate, and provides a complete picture of
     
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
         """Parse JSON response from Gemini, handling markdown code blocks."""
+        if not text or not isinstance(text, str):
+            logger.warning("Empty or invalid text provided for JSON parsing")
+            return {}
+            
         text = text.strip()
         if text.startswith('```json'):
             text = text[7:]
@@ -763,10 +907,17 @@ Ensure the output is comprehensive, accurate, and provides a complete picture of
             text = text[:-3]
         text = text.strip()
         
+        if not text:
+            logger.warning("Text is empty after cleaning")
+            return {}
+        
         try:
-            return json.loads(text)
+            result = json.loads(text)
+            logger.info(f"Successfully parsed JSON response with keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+            return result
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON: {e}")
+            logger.error(f"Raw text: {text[:500]}...")
             return {}
     
     # Update Broadcasting

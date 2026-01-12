@@ -1,0 +1,364 @@
+/* Documentary Section Styles */
+.documentary-section {
+  background: radial-gradient(
+    ellipse at bottom left,
+    rgba(255, 46, 151, 0.05) 0%,
+    transparent 70%
+  );
+  padding-bottom: 8rem !important;
+}
+
+/* Documentary Overview */
+.documentary-overview {
+  padding: 3rem;
+  text-align: center;
+  margin: 3rem 0;
+}
+
+.documentary-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.documentary-tagline {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 1.5rem 0;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.documentary-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.5rem;
+  border-radius: 25px;
+  background: rgba(0, 212, 255, 0.1);
+  color: #00d4ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Segments */
+.documentary-segments {
+  margin-top: 5rem;
+}
+
+.segments-title {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.segments-timeline {
+  position: relative;
+  padding-left: 3rem;
+}
+
+.segments-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #00d4ff, #7b2ff7, #ff2e97);
+}
+
+.segment-card {
+  position: relative;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 2rem;
+  transition: all 0.3s ease;
+}
+
+.segment-card::before {
+  content: '';
+  position: absolute;
+  left: -3.5rem;
+  top: 2.5rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00d4ff;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+  z-index: 2;
+}
+
+.segment-number {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(123, 47, 247, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #00d4ff;
+}
+
+.segment-content {
+  flex: 1;
+}
+
+.segment-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.75rem;
+}
+
+.segment-duration {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #7b2ff7;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+}
+
+.segment-narration {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin: 1rem 0;
+  border-left: 3px solid #00d4ff;
+}
+
+.narration-icon {
+  display: inline-flex;
+  color: #00d4ff;
+  margin-bottom: 0.5rem;
+}
+
+.segment-narration p {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.85);
+  font-style: italic;
+}
+
+.segment-visuals {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 1rem;
+}
+
+.segment-visuals strong {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.segment-moments {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.segment-moments li {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  padding-left: 1.5rem;
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.segment-moments li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: #00d4ff;
+}
+
+/* Closing Statement */
+.documentary-closing {
+  padding: 3rem;
+  text-align: center;
+  margin: 4rem 0;
+}
+
+.closing-icon {
+  margin: 0 auto 1.5rem;
+  color: #ffaa00;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.closing-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.closing-statement {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Video CTA */
+.video-cta {
+  text-align: center;
+  margin: 4rem 0;
+}
+
+.generate-video-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem 3rem;
+  border-radius: 50px;
+  border: 2px solid #00d4ff;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(123, 47, 247, 0.1));
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.generate-video-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(123, 47, 247, 0.3));
+  box-shadow: 0 10px 40px rgba(0, 212, 255, 0.4);
+  transform: translateY(-3px);
+}
+
+.generate-video-btn svg {
+  color: #00d4ff;
+}
+
+.video-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 1rem;
+}
+
+.video-note svg {
+  flex-shrink: 0;
+}
+
+/* Footer */
+.journey-footer {
+  text-align: center;
+  padding: 3rem 0;
+  margin-top: 5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer-content p {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0.5rem 0;
+}
+
+.footer-name {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .documentary-overview {
+    padding: 2rem;
+  }
+
+  .documentary-title {
+    font-size: 2rem;
+  }
+
+  .documentary-tagline {
+    font-size: 1.1rem;
+  }
+
+  .segments-timeline {
+    padding-left: 2rem;
+  }
+
+  .segment-card {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .segment-card::before {
+    left: -2.5rem;
+  }
+
+  .segment-number {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+
+  .segment-title {
+    font-size: 1.2rem;
+  }
+
+  .generate-video-btn {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+  }
+
+  .documentary-closing {
+    padding: 2rem;
+  }
+
+  .closing-title {
+    font-size: 1.5rem;
+  }
+
+  .closing-statement {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .documentary-title {
+    font-size: 1.8rem;
+  }
+
+  .segments-timeline {
+    padding-left: 1.5rem;
+  }
+
+  .segment-card::before {
+    left: -2rem;
+    width: 10px;
+    height: 10px;
+  }
+
+  .generate-video-btn {
+    padding: 0.9rem 1.5rem;
+    font-size: 0.95rem;
+  }
+
+  .video-note {
+    font-size: 0.8rem;
+  }
+}

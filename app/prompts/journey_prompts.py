@@ -312,6 +312,9 @@ Return a JSON object with the complete documentary structure."""
 
 def _format_profile_for_prompt(profile_data: Dict[str, Any]) -> str:
     """Format profile data for inclusion in prompts."""
+    if not profile_data or not isinstance(profile_data, dict):
+        return "No profile data available"
+    
     sections = []
     
     if profile_data.get('name'):
@@ -323,21 +326,27 @@ def _format_profile_for_prompt(profile_data: Dict[str, Any]) -> str:
     if profile_data.get('bio'):
         sections.append(f"Bio: {profile_data['bio'][:500]}")
     
-    if profile_data.get('experiences'):
+    if profile_data.get('experiences') and isinstance(profile_data['experiences'], list):
         exp_list = []
         for exp in profile_data['experiences'][:5]:
-            exp_str = f"- {exp.get('title', 'N/A')} at {exp.get('company', 'N/A')} ({exp.get('duration', 'N/A')})"
-            exp_list.append(exp_str)
-        sections.append(f"Experiences:\n" + "\n".join(exp_list))
+            if isinstance(exp, dict):
+                exp_str = f"- {exp.get('title', 'N/A')} at {exp.get('company', 'N/A')} ({exp.get('duration', 'N/A')})"
+                exp_list.append(exp_str)
+        if exp_list:
+            sections.append(f"Experiences:\n" + "\n".join(exp_list))
     
-    if profile_data.get('skills'):
-        sections.append(f"Skills: {', '.join(profile_data['skills'][:15])}")
+    if profile_data.get('skills') and isinstance(profile_data['skills'], list):
+        sections.append(f"Skills: {', '.join(str(s) for s in profile_data['skills'][:15])}")
     
-    if profile_data.get('achievements'):
-        ach_list = [f"- {a.get('title', 'N/A')} ({a.get('date', 'N/A')})" for a in profile_data['achievements'][:3]]
-        sections.append(f"Achievements:\n" + "\n".join(ach_list))
+    if profile_data.get('achievements') and isinstance(profile_data['achievements'], list):
+        ach_list = []
+        for a in profile_data['achievements'][:3]:
+            if isinstance(a, dict):
+                ach_list.append(f"- {a.get('title', 'N/A')} ({a.get('date', 'N/A')})")
+        if ach_list:
+            sections.append(f"Achievements:\n" + "\n".join(ach_list))
     
-    return "\n\n".join(sections)
+    return "\n\n".join(sections) if sections else "Limited profile data available"
 
 
 def _format_journey_for_prompt(journey_data: Dict[str, Any]) -> str:

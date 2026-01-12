@@ -23,6 +23,16 @@ class Connection:
     job_id: str
     connected_at: datetime = field(default_factory=datetime.utcnow)
     
+    def __hash__(self):
+        """Make Connection hashable by using websocket object id and job_id."""
+        return hash((id(self.websocket), self.job_id))
+    
+    def __eq__(self, other):
+        """Equality based on websocket object identity and job_id."""
+        if not isinstance(other, Connection):
+            return False
+        return id(self.websocket) == id(other.websocket) and self.job_id == other.job_id
+    
     async def send(self, data: Dict[str, Any]) -> bool:
         """Send data to the WebSocket."""
         try:

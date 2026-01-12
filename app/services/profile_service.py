@@ -86,7 +86,8 @@ class ProfileExtractionService:
         # Create ProfileHistory record
         history = ProfileHistory(
             user_id=user.id,
-            source_url=url
+            source_url=url,
+            raw_data={"job_id": job_id}
         )
         db.add(history)
         await db.commit()
@@ -195,30 +196,62 @@ class ProfileExtractionService:
             # Execute the plan
             await task_orchestrator.execute_plan(job_id)
             
-            # Get final results
+            # Get results (even if plan failed, we want to save partial progress)
             plan = task_orchestrator.get_plan(job_id)
-            if plan and plan.status == TaskStatus.COMPLETED:
-                # Extract final data
+            if plan:
+                # Extract results
                 result_data = plan.result_data
                 
-                # Build profile data from results
+                # Build profile data from results (look for best available data)
                 profile_data = self._build_profile_from_results(result_data, plan.source_url)
                 
-                # Save to database
-                await self._save_to_database(history_id, profile_data)
+                # Extract journey components
+                journey_data = result_data.get("structure_journey", {})
+                timeline_data = result_data.get("generate_timeline", {})
+                documentary_data = result_data.get("generate_documentary", {})
                 
-                # Update job with final data
-                profile_jobs[job_id].update({
-                    "status": ProfileStatus.COMPLETED,
-                    "progress": 100,
-                    "message": "Profile extraction completed successfully",
-                    "data": profile_data,
-                    "journey": result_data.get("structure_journey", {}),
-                    "timeline": result_data.get("generate_timeline", {}),
-                    "documentary": result_data.get("generate_documentary", {}),
-                })
+                # If plan completed normally, update job with full data
+                if plan.status == TaskStatus.COMPLETED:
+                    # Save comprehensive data to database
+                    await self._save_comprehensive_data_to_database(
+                        history_id, 
+                        profile_data, 
+                        journey_data, 
+                        timeline_data, 
+                        documentary_data
+                    )
+                    
+                    profile_jobs[job_id].update({
+                        "status": ProfileStatus.COMPLETED,
+                        "progress": 100,
+                        "message": "Profile extraction completed successfully",
+                        "data": profile_data,
+                        "journey": journey_data,
+                        "timeline": timeline_data,
+                        "documentary": documentary_data,
+                    })
+                else:
+                    # Plan failed or was partially completed
+                    # Still save the profile data we have to database for consistency
+                    if profile_data and (profile_data.get('name') or profile_data.get('experiences')):
+                        await self._save_comprehensive_data_to_database(
+                            history_id,
+                            profile_data,
+                            journey_data,
+                            timeline_data,
+                            documentary_data
+                        )
+                    
+                    profile_jobs[job_id].update({
+                        "status": ProfileStatus.FAILED,
+                        "progress": plan.progress,
+                        "error": profile_jobs[job_id].get("error", "Plan failed during execution"),
+                        "data": profile_data, # Return partial data if available
+                        "journey": journey_data,
+                    })
                 
-                self._log_extraction_results(job_id, profile_data)
+                if profile_data:
+                    self._log_extraction_results(job_id, profile_data)
             
             # Unregister callback
             task_orchestrator.unregister_callback(job_id, progress_callback)
@@ -242,11 +275,19 @@ class ProfileExtractionService:
             Structured profile data
         """
         # Get profile data from fetch or aggregate task
-        profile = result_data.get("aggregate_history", {})
-        if not profile:
-            profile = result_data.get("enrich_profile", {})
-        if not profile:
-            profile = result_data.get("fetch_profile", {})
+        # Use .get() without a default first to check if it's truthy
+        profile = result_data.get("aggregate_history")
+        if not profile or not isinstance(profile, dict):
+            profile = result_data.get("enrich_profile")
+        if not profile or not isinstance(profile, dict):
+            profile = result_data.get("fetch_profile")
+        
+        # Ensure we have a dictionary
+        if not profile or not isinstance(profile, dict):
+            profile = self._get_empty_profile_data()
+        else:
+            # Create a copy to avoid modifying the original plan outputs
+            profile = profile.copy()
         
         # Ensure required fields
         profile["source_url"] = source_url
@@ -287,6 +328,52 @@ class ProfileExtractionService:
                 logger.warning("Database session maker not available")
         except Exception as db_error:
             logger.error(f"Failed to save to database: {db_error}")
+
+    async def _save_comprehensive_data_to_database(
+        self, 
+        history_id: str, 
+        profile_data: Dict[str, Any],
+        journey_data: Dict[str, Any],
+        timeline_data: Dict[str, Any],
+        documentary_data: Dict[str, Any]
+    ) -> None:
+        """Save comprehensive data including journey components to database.
+        
+        Args:
+            history_id: ProfileHistory record ID
+            profile_data: Extracted profile data
+            journey_data: Journey structure data
+            timeline_data: Timeline data
+            documentary_data: Documentary data
+        """
+        try:
+            from app.db.session import async_session_maker
+            if async_session_maker is not None:
+                async with async_session_maker() as db:
+                    # Combine all data into structured_data
+                    comprehensive_data = {
+                        **{k: v for k, v in profile_data.items() 
+                           if k not in ['raw_data', 'source_url', 'extraction_timestamp']},
+                        "journey": journey_data,
+                        "timeline": timeline_data,
+                        "documentary": documentary_data,
+                        "generated_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    await db.execute(
+                        update(ProfileHistory)
+                        .where(ProfileHistory.id == history_id)
+                        .values(
+                            raw_data=profile_data.get("raw_data", {}),
+                            structured_data=comprehensive_data
+                        )
+                    )
+                    await db.commit()
+                    logger.info(f"Saved comprehensive data to database for history_id: {history_id}")
+            else:
+                logger.warning("Database session maker not available")
+        except Exception as db_error:
+            logger.error(f"Failed to save comprehensive data to database: {db_error}")
     
     def _log_extraction_results(self, job_id: str, profile_data: Dict[str, Any]) -> None:
         """Log extraction results for debugging."""
@@ -300,17 +387,55 @@ class ProfileExtractionService:
         print(f"Skills: {len(profile_data.get('skills', []))} found")
         print("="*80 + "\n")
     
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str, db: Optional[AsyncSession] = None) -> Dict[str, Any]:
         """Get the status of a profile extraction job.
         
         Args:
             job_id: Job identifier
+            db: Optional database session for recovery
             
         Returns:
             Job status information including task details
         """
         if job_id not in profile_jobs:
-            raise HTTPException(status_code=404, detail="Job not found")
+            # Attempt to recover from database
+            if db:
+                try:
+                    # Query ProfileHistory where raw_data->job_id matches target job_id
+                    # This works for both MySQL and SQLite JSON columns in SQLAlchemy
+                    query = select(ProfileHistory).where(ProfileHistory.raw_data["job_id"] == job_id)
+                    result = await db.execute(query)
+                    history = result.scalar_one_or_none()
+                    
+                    if history:
+                        # Found in DB - if it has structured_data, it's completed
+                        if history.structured_data:
+                            # Reconstruct a "completed" job status
+                            data = history.structured_data
+                            return {
+                                "status": ProfileStatus.COMPLETED,
+                                "progress": 100,
+                                "message": "Profile extraction recovered from history",
+                                "data": {k: v for k, v in data.items() if k not in ["journey", "timeline", "documentary"]},
+                                "journey": data.get("journey"),
+                                "timeline": data.get("timeline"),
+                                "documentary": data.get("documentary"),
+                                "history_id": history.id,
+                                "recovered": True
+                            }
+                        else:
+                            # Found record but no data - likely failed/crashed
+                            return {
+                                "status": ProfileStatus.FAILED,
+                                "progress": 0,
+                                "message": "Generation session was interrupted and could not be completed.",
+                                "error": "Session lost due to server restart",
+                                "recovered": True
+                            }
+                except Exception as e:
+                    logger.error(f"Error recovering job {job_id} from DB: {e}")
+            
+            raise HTTPException(status_code=404, detail="Job session not found")
         
         job_data = profile_jobs[job_id].copy()
         

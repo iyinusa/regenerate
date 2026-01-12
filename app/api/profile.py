@@ -86,7 +86,10 @@ async def generate_profile(
     summary="Get Profile Generation Status",
     description="Check the status and progress of a profile generation job including task details."
 )
-async def get_profile_status(job_id: str) -> ProfileStatusResponse:
+async def get_profile_status(
+    job_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> ProfileStatusResponse:
     """Get profile generation status with task details.
     
     Returns the current status of all tasks in the execution pipeline,
@@ -96,12 +99,13 @@ async def get_profile_status(job_id: str) -> ProfileStatusResponse:
     
     Args:
         job_id: The job identifier returned from the generate endpoint
+        db: Database session for recovery
         
     Returns:
         Current job status with task details and extracted data
     """
     try:
-        job_data = await profile_service.get_job_status(job_id)
+        job_data = await profile_service.get_job_status(job_id, db=db)
         
         # Convert task dictionaries to TaskInfo objects
         tasks = None
@@ -175,7 +179,10 @@ async def get_task_details(job_id: str) -> Dict[str, Any]:
     summary="Get Profile Data", 
     description="Retrieve the complete extracted profile data by profile ID."
 )
-async def get_profile(profile_id: str) -> Dict[str, Any]:
+async def get_profile(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
     """Get profile data by ID.
     
     Returns the complete profile data including journey, timeline,
@@ -183,12 +190,13 @@ async def get_profile(profile_id: str) -> Dict[str, Any]:
     
     Args:
         profile_id: Profile identifier (job_id)
+        db: Database session for recovery
         
     Returns:
         Complete profile data
     """
     try:
-        job_data = await profile_service.get_job_status(profile_id)
+        job_data = await profile_service.get_job_status(profile_id, db=db)
         
         if job_data["status"] != ProfileStatus.COMPLETED:
             raise HTTPException(
@@ -210,4 +218,107 @@ async def get_profile(profile_id: str) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get profile: {str(e)}"
+        )
+
+
+@router.get(
+    "/journey/{guest_id}",
+    summary="Get Journey Data by Guest ID",
+    description="Retrieve the most recent journey data for a guest user."
+)
+async def get_journey_by_guest_id(
+    guest_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get the most recent journey data by guest ID.
+    
+    This endpoint loads the latest profile history for the given guest_id,
+    enabling consistent journey experiences and supporting future username conversion.
+    
+    Args:
+        guest_id: The guest user identifier
+        db: Database session
+        
+    Returns:
+        Complete journey data with profile, timeline, and documentary
+    """
+    try:
+        from app.models.user import User, ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Looking for journey data for guest_id: {guest_id}")
+        
+        # Find user by guest_id
+        user_query = select(User).where(User.guest_id == guest_id)
+        result = await db.execute(user_query)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            logger.warning(f"No user found with guest_id: {guest_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No user found with guest_id: {guest_id}"
+            )
+        
+        logger.info(f"Found user {user.id} for guest_id: {guest_id}")
+        
+        # Get the most recent profile history
+        history_query = select(ProfileHistory).where(
+            ProfileHistory.user_id == user.id
+        ).order_by(ProfileHistory.created_at.desc())
+        result = await db.execute(history_query)
+        latest_history = result.scalars().first()
+        
+        if not latest_history:
+            logger.warning(f"No profile history found for user {user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No profile history found for guest_id: {guest_id}"
+            )
+        
+        logger.info(f"Found profile history {latest_history.id}, structured_data exists: {latest_history.structured_data is not None}, raw_data exists: {latest_history.raw_data is not None}")
+        
+        if not latest_history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No profile history found for guest_id: {guest_id}"
+            )
+        
+        # Get structured data, provide fallback if empty
+        structured_data = latest_history.structured_data or {}
+        raw_data = latest_history.raw_data or {}
+        
+        # Determine profile data part (excluding journey components)
+        profile_content = {
+            k: v for k, v in structured_data.items() 
+            if k not in ["journey", "timeline", "documentary", "generated_at"]
+        } if structured_data else raw_data
+        
+        # If still no meaningful data, return error
+        if not profile_content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No profile data available for guest_id: {guest_id}. Profile generation may still be in progress."
+            )
+        
+        # Return the comprehensive journey data
+        return {
+            "guest_id": guest_id,
+            "profile": profile_content,
+            "journey": structured_data.get("journey", {}),
+            "timeline": structured_data.get("timeline", {}),
+            "documentary": structured_data.get("documentary", {}),
+            "source_url": latest_history.source_url,
+            "created_at": latest_history.created_at.isoformat(),
+            "generated_at": structured_data.get("generated_at"),
+            "history_id": latest_history.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get journey for guest_id {guest_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get journey data: {str(e)}"
         )
