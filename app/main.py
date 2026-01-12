@@ -18,7 +18,7 @@ from app.api.routes import api_router
 # Create FastAPI application
 app = FastAPI(
     title="reGen API",
-    description="reGen helps regenerate and tells your journey better using AI to analyze your professional contributions and create compelling narratives.",
+    description="reGen helps regenerate and tells your journey better using smart AI to analyse professional contributions and create compelling narratives in an immersive cinematic experience.",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",

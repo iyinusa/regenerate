@@ -1,3 +1,7 @@
+/* ===========================================
+   reGen Processing Page - Enhanced Styles
+   =========================================== */
+
 .processing-page {
 	display: flex;
 	align-items: center;
@@ -6,156 +10,614 @@
 	padding: 2rem;
 	background: var(--primary-bg);
 	color: var(--text-primary);
+	position: relative;
+	overflow: hidden;
 }
 
+/* Background subtle animation */
+.processing-page::before {
+	content: '';
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	width: 200%;
+	height: 200%;
+	background: radial-gradient(
+		circle at center,
+		rgba(0, 212, 255, 0.03) 0%,
+		transparent 50%
+	);
+	animation: backgroundPulse 8s ease-in-out infinite;
+	pointer-events: none;
+}
+
+@keyframes backgroundPulse {
+	0%, 100% { transform: scale(1); opacity: 0.5; }
+	50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+/* Container */
 .processing-container {
-	max-width: 600px;
+	max-width: 700px;
 	width: 100%;
+	position: relative;
+	z-index: 1;
+}
+
+.processing-container.error-state {
 	text-align: center;
+}
+
+/* Header Section */
+.processing-header {
+	text-align: center;
+	margin-bottom: 2rem;
+	position: relative;
+}
+
+.header-glow {
+	position: absolute;
+	top: -30px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 300px;
+	height: 100px;
+	background: radial-gradient(ellipse, rgba(0, 212, 255, 0.15), transparent 70%);
+	filter: blur(20px);
+	pointer-events: none;
 }
 
 .processing-header h1 {
 	font-size: 2.5rem;
 	font-weight: 700;
 	margin-bottom: 1rem;
+	animation: fadeInUp 0.6s ease-out;
 }
 
-.processing-header p {
+.gradient-text {
+	background: var(--gradient-primary);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.url-display {
 	color: var(--text-secondary);
-	margin-bottom: 1rem;
-	font-size: 1.1rem;
+	font-size: 1rem;
+	margin-bottom: 0.5rem;
+	animation: fadeInUp 0.6s ease-out 0.1s both;
 }
 
-.processing-header strong {
+.url-highlight {
 	color: var(--accent-blue);
+	font-weight: 500;
+	word-break: break-all;
 }
 
-.job-id {
-	font-size: 0.9rem !important;
-	color: var(--text-muted) !important;
-	margin-bottom: 3rem !important;
-}
-
-.job-id code {
-	background: var(--glass);
-	padding: 4px 8px;
-	border-radius: 6px;
-	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-	color: var(--accent-blue);
-}
-
-.processing-steps {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	margin-bottom: 2rem;
-	margin-top: 3rem;
-}
-
-.step {
-	display: flex;
-	align-items: center;
-	gap: 1rem;
-	padding: 1rem;
-	border-radius: 10px;
-	transition: all 0.3s ease;
-	text-align: left;
-}
-
-.step.completed {
-	background: rgba(0, 212, 255, 0.1);
-	color: var(--accent-blue);
-}
-
-.step.active {
-	background: var(--glass);
-	backdrop-filter: blur(10px);
-	border: 1px solid var(--glass-border);
-}
-
-.step-indicator {
-	width: 40px;
-	height: 40px;
-	border-radius: 50%;
+/* Connection Status */
+.connection-status {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-weight: 600;
-	flex-shrink: 0;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+	animation: fadeInUp 0.6s ease-out 0.2s both;
 }
 
-.step.completed .step-indicator {
-	background: var(--accent-blue);
-	color: var(--primary-bg);
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	transition: background-color 0.3s ease;
 }
 
-.step.active .step-indicator {
-	background: var(--gradient-primary);
-	color: white;
+.status-dot.connected {
+	background-color: #00cc66;
+	box-shadow: 0 0 8px rgba(0, 204, 102, 0.5);
+	animation: pulse 2s ease-in-out infinite;
 }
 
-.step:not(.active):not(.completed) .step-indicator {
-	background: var(--secondary-bg);
+.status-dot.disconnected {
+	background-color: #ff6633;
+	animation: blink 1s ease-in-out infinite;
+}
+
+.status-text {
+	font-size: 0.8rem;
 	color: var(--text-muted);
-	border: 2px solid var(--text-muted);
 }
 
-.loading-spinner {
-	width: 20px;
-	height: 20px;
-	border: 2px solid transparent;
-	border-top: 2px solid currentColor;
+/* Current Status Banner */
+.current-status {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	padding: 1rem 1.5rem;
+	background: var(--glass);
+	backdrop-filter: blur(10px);
+	border: 1px solid var(--glass-border);
+	border-radius: 12px;
+	margin-bottom: 2rem;
+	animation: fadeInUp 0.6s ease-out 0.3s both;
+}
+
+.status-pulse {
+	width: 12px;
+	height: 12px;
+	background: var(--accent-blue);
+	border-radius: 50%;
+	animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+	0%, 100% { 
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% { 
+		transform: scale(1.3);
+		opacity: 0.7;
+	}
+}
+
+.status-message {
+	font-size: 1rem;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+/* Tasks Container */
+.tasks-container {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-bottom: 2rem;
+}
+
+/* Task Item */
+.task-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 1rem;
+	padding: 1rem 1.25rem;
+	background: var(--secondary-bg);
+	border-radius: 12px;
+	border: 1px solid transparent;
+	transition: all 0.3s ease;
+	animation: slideIn 0.5s ease-out both;
+	position: relative;
+	overflow: hidden;
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateX(-20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+/* Task States */
+.task-item.pending {
+	opacity: 0.6;
+}
+
+.task-item.running {
+	background: var(--glass);
+	border-color: var(--accent-blue);
+	box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+}
+
+.task-item.running::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 2px;
+	background: var(--gradient-primary);
+	animation: progressShimmer 2s ease-in-out infinite;
+}
+
+@keyframes progressShimmer {
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(100%); }
+}
+
+.task-item.current {
+	transform: scale(1.02);
+}
+
+.task-item.completed {
+	background: rgba(0, 204, 102, 0.08);
+	border-color: rgba(0, 204, 102, 0.2);
+}
+
+.task-item.failed {
+	background: rgba(255, 102, 51, 0.08);
+	border-color: rgba(255, 102, 51, 0.3);
+}
+
+.task-item.skipped {
+	opacity: 0.5;
+}
+
+/* Task Icon */
+.task-icon-wrapper {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.task-icon {
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.task-icon.pending {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--secondary-bg);
+	border: 2px solid var(--text-muted);
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.task-icon.running {
+	width: 32px;
+	height: 32px;
+}
+
+.task-icon.running .spinner {
+	width: 100%;
+	height: 100%;
+	border: 3px solid rgba(0, 212, 255, 0.2);
+	border-top-color: var(--accent-blue);
 	border-radius: 50%;
 	animation: spin 1s linear infinite;
 }
 
+.task-icon.completed {
+	color: #00cc66;
+}
+
+.task-icon.failed {
+	color: #ff6633;
+}
+
+.task-icon.skipped {
+	color: var(--text-muted);
+}
+
 @keyframes spin {
-	0% { transform: rotate(0deg); }
-	100% { transform: rotate(360deg); }
+	to { transform: rotate(360deg); }
 }
 
-.step-text {
-	font-size: 1.1rem;
-	font-weight: 500;
+/* Task Content */
+.task-content {
+	flex: 1;
+	min-width: 0;
 }
 
-.progress-bar {
-	width: 100%;
-	height: 8px;
-	background: var(--secondary-bg);
+.task-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.25rem;
+}
+
+.task-name {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.task-percentage {
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: var(--accent-blue);
+	padding: 0.15rem 0.5rem;
+	background: rgba(0, 212, 255, 0.1);
 	border-radius: 4px;
-	overflow: hidden;
-	margin-bottom: 2rem;
 }
 
-.progress-fill {
+.task-description {
+	font-size: 0.85rem;
+	color: var(--text-secondary);
+	line-height: 1.4;
+}
+
+/* Task Progress Bar */
+.task-progress-bar {
+	height: 4px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 2px;
+	margin-top: 0.75rem;
+	overflow: hidden;
+}
+
+.task-progress-fill {
 	height: 100%;
 	background: var(--gradient-primary);
-	border-radius: 4px;
-	transition: width 0.5s ease;
+	border-radius: 2px;
+	transition: width 0.3s ease;
+	position: relative;
 }
 
-.processing-note {
-	color: var(--text-muted);
+.task-progress-fill::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.3),
+		transparent
+	);
+	animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(100%); }
+}
+
+/* Task Error */
+.task-error {
+	font-size: 0.8rem;
+	color: #ff6633;
+	margin-top: 0.5rem;
+	padding: 0.5rem;
+	background: rgba(255, 102, 51, 0.1);
+	border-radius: 6px;
+}
+
+/* Task Checkmark Animation */
+.task-checkmark {
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	color: #00cc66;
+	animation: checkmarkPop 0.4s ease-out;
+}
+
+@keyframes checkmarkPop {
+	0% {
+		transform: scale(0);
+		opacity: 0;
+	}
+	50% {
+		transform: scale(1.2);
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+/* Overall Progress */
+.overall-progress {
+	margin-bottom: 2rem;
+	animation: fadeInUp 0.6s ease-out 0.5s both;
+}
+
+.progress-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+
+.progress-header span:first-child {
 	font-size: 0.9rem;
-	line-height: 1.5;
+	font-weight: 500;
+	color: var(--text-secondary);
 }
 
+.progress-percentage {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: var(--accent-blue);
+}
+
+.progress-bar-container {
+	height: 10px;
+	background: var(--secondary-bg);
+	border-radius: 5px;
+	overflow: hidden;
+	position: relative;
+}
+
+.progress-bar-fill {
+	height: 100%;
+	background: var(--gradient-primary);
+	border-radius: 5px;
+	transition: width 0.5s ease;
+	position: relative;
+	overflow: hidden;
+}
+
+.progress-bar-glow {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 30px;
+	height: 100%;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.5),
+		transparent
+	);
+	animation: progressGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes progressGlow {
+	0%, 100% { opacity: 0; transform: translateX(-20px); }
+	50% { opacity: 1; transform: translateX(0); }
+}
+
+/* Processing Note */
+.processing-note {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	color: var(--text-muted);
+	font-size: 0.85rem;
+	text-align: center;
+	animation: fadeInUp 0.6s ease-out 0.6s both;
+}
+
+.processing-note svg {
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+/* Error State */
+.error-state {
+	animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+	0%, 100% { transform: translateX(0); }
+	25% { transform: translateX(-10px); }
+	75% { transform: translateX(10px); }
+}
+
+.error-icon {
+	color: #ff6633;
+	margin-bottom: 1.5rem;
+	animation: errorPulse 2s ease-in-out infinite;
+}
+
+@keyframes errorPulse {
+	0%, 100% { transform: scale(1); }
+	50% { transform: scale(1.05); }
+}
+
+.error-state h1 {
+	font-size: 1.75rem;
+	color: var(--text-primary);
+	margin-bottom: 1rem;
+}
+
+.error-message {
+	color: var(--text-secondary);
+	margin-bottom: 2rem;
+	font-size: 1rem;
+}
+
+.retry-button {
+	padding: 0.875rem 2rem;
+	background: var(--gradient-primary);
+	border: none;
+	border-radius: 8px;
+	color: white;
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s ease;
+}
+
+.retry-button:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
+
+@keyframes blink {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.3; }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
+	.processing-container {
+		padding: 0 1rem;
+	}
+
 	.processing-header h1 {
-		font-size: 2rem;
+		font-size: 1.75rem;
 	}
 
-	.step {
-		padding: 0.75rem;
+	.task-item {
+		padding: 0.875rem 1rem;
 	}
 
-	.step-indicator {
-		width: 35px;
-		height: 35px;
+	.task-icon-wrapper {
+		width: 36px;
+		height: 36px;
 	}
 
-	.step-text {
-		font-size: 1rem;
+	.task-icon,
+	.task-icon.pending {
+		width: 28px;
+		height: 28px;
+	}
+
+	.task-name {
+		font-size: 0.95rem;
+	}
+
+	.task-description {
+		font-size: 0.8rem;
+	}
+
+	.current-status {
+		padding: 0.875rem 1rem;
+	}
+
+	.status-message {
+		font-size: 0.9rem;
+	}
+}
+
+@media (max-width: 480px) {
+	.processing-header h1 {
+		font-size: 1.5rem;
+	}
+
+	.url-display {
+		font-size: 0.9rem;
+	}
+
+	.task-item {
+		gap: 0.75rem;
+	}
+
+	.task-checkmark {
+		display: none;
 	}
 }

@@ -1,0 +1,818 @@
+"""Task Orchestrator Service for Chain of Thought (CoT) Task Management.
+
+This service coordinates the execution of planned tasks for profile-to-journey
+transformation, providing real-time updates via WebSocket connections.
+"""
+
+import asyncio
+import json
+import logging
+import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Dict, Any, List, Optional, Callable, Set
+from dataclasses import dataclass, field, asdict
+
+from google import genai
+from google.genai import types
+
+from app.core.config import settings
+from app.prompts import (
+    get_profile_extraction_prompt,
+    get_journey_structuring_prompt,
+    get_timeline_generation_prompt,
+    get_documentary_narrative_prompt,
+    PROFILE_EXTRACTION_SCHEMA,
+    JOURNEY_STRUCTURE_SCHEMA,
+    TIMELINE_SCHEMA,
+    DOCUMENTARY_SCHEMA,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class TaskStatus(str, Enum):
+    """Task execution status."""
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class TaskType(str, Enum):
+    """Types of tasks in the pipeline."""
+    FETCH_PROFILE = "fetch_profile"
+    ENRICH_PROFILE = "enrich_profile"
+    AGGREGATE_HISTORY = "aggregate_history"
+    STRUCTURE_JOURNEY = "structure_journey"
+    GENERATE_TIMELINE = "generate_timeline"
+    GENERATE_DOCUMENTARY = "generate_documentary"
+    GENERATE_VIDEO = "generate_video"
+
+
+@dataclass
+class Task:
+    """Represents a single task in the execution pipeline."""
+    task_id: str
+    task_type: TaskType
+    name: str
+    description: str
+    order: int
+    status: TaskStatus = TaskStatus.PENDING
+    progress: int = 0
+    message: str = ""
+    dependencies: List[str] = field(default_factory=list)
+    outputs: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    estimated_seconds: int = 30
+    critical: bool = True
+    retry_count: int = 0
+    max_retries: int = 2
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert task to dictionary for JSON serialization."""
+        return {
+            "task_id": self.task_id,
+            "task_type": self.task_type.value,
+            "name": self.name,
+            "description": self.description,
+            "order": self.order,
+            "status": self.status.value,
+            "progress": self.progress,
+            "message": self.message,
+            "dependencies": self.dependencies,
+            "error": self.error,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "estimated_seconds": self.estimated_seconds,
+            "critical": self.critical,
+        }
+
+
+@dataclass
+class TaskPlan:
+    """Represents an execution plan containing multiple tasks."""
+    plan_id: str
+    job_id: str
+    source_url: str
+    tasks: List[Task]
+    options: Dict[str, Any] = field(default_factory=dict)
+    status: TaskStatus = TaskStatus.PENDING
+    progress: int = 0
+    current_task_id: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    result_data: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert plan to dictionary for JSON serialization."""
+        return {
+            "plan_id": self.plan_id,
+            "job_id": self.job_id,
+            "source_url": self.source_url,
+            "status": self.status.value,
+            "progress": self.progress,
+            "current_task_id": self.current_task_id,
+            "created_at": self.created_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "tasks": [task.to_dict() for task in self.tasks],
+            "total_tasks": len(self.tasks),
+            "completed_tasks": sum(1 for t in self.tasks if t.status == TaskStatus.COMPLETED),
+        }
+
+
+class TaskOrchestrator:
+    """Orchestrates task execution with Chain of Thought planning."""
+    
+    # Class-level storage for active plans (replace with Redis in production)
+    _active_plans: Dict[str, TaskPlan] = {}
+    _update_callbacks: Dict[str, Set[Callable]] = {}
+    
+    def __init__(self):
+        """Initialize the task orchestrator."""
+        self.genai_client = None
+        
+        if settings.ai_provider_api_key:
+            try:
+                self.genai_client = genai.Client(
+                    api_key=settings.ai_provider_api_key,
+                    http_options={'timeout': 600000}
+                )
+                logger.info("Task Orchestrator: Gemini client initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini client: {e}")
+    
+    def create_plan(self, job_id: str, source_url: str, options: Dict[str, Any] = None) -> TaskPlan:
+        """Create an execution plan for the given source.
+        
+        This uses Chain of Thought reasoning to determine the optimal
+        task sequence based on the source type and options.
+        
+        Args:
+            job_id: Unique job identifier
+            source_url: The source URL to process
+            options: Processing options
+            
+        Returns:
+            TaskPlan with ordered tasks
+        """
+        options = options or {}
+        plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+        
+        # Determine source type and create appropriate task chain
+        tasks = self._create_task_chain(source_url, options)
+        
+        plan = TaskPlan(
+            plan_id=plan_id,
+            job_id=job_id,
+            source_url=source_url,
+            tasks=tasks,
+            options=options,
+        )
+        
+        # Store the plan
+        self._active_plans[job_id] = plan
+        
+        logger.info(f"Created task plan {plan_id} with {len(tasks)} tasks for job {job_id}")
+        return plan
+    
+    def _create_task_chain(self, source_url: str, options: Dict[str, Any]) -> List[Task]:
+        """Create the chain of tasks based on source and options.
+        
+        Uses Chain of Thought reasoning to determine optimal task sequence.
+        
+        Args:
+            source_url: Source URL to analyze
+            options: Processing options
+            
+        Returns:
+            List of Task objects in execution order
+        """
+        tasks = []
+        
+        # Task 1: Fetch Profile (always first)
+        tasks.append(Task(
+            task_id="task_001",
+            task_type=TaskType.FETCH_PROFILE,
+            name="Extracting Profile Data",
+            description="Using Gemini 3 to fetch and analyze profile data from the source URL",
+            order=1,
+            estimated_seconds=45,
+            critical=True,
+            dependencies=[],
+        ))
+        
+        # Task 2: Enrich Profile (discover and aggregate additional sources)
+        tasks.append(Task(
+            task_id="task_002",
+            task_type=TaskType.ENRICH_PROFILE,
+            name="Enriching Profile",
+            description="Discovering and aggregating data from related sources",
+            order=2,
+            estimated_seconds=60,
+            critical=False,  # Can continue without enrichment
+            dependencies=["task_001"],
+        ))
+        
+        # Task 3: Aggregate History (if user has existing data)
+        tasks.append(Task(
+            task_id="task_003",
+            task_type=TaskType.AGGREGATE_HISTORY,
+            name="Aggregating History",
+            description="Merging with existing profile history for comprehensive view",
+            order=3,
+            estimated_seconds=60,
+            critical=False,
+            dependencies=["task_002"],
+        ))
+        
+        # Task 4: Structure Journey (main transformation)
+        tasks.append(Task(
+            task_id="task_004",
+            task_type=TaskType.STRUCTURE_JOURNEY,
+            name="Structuring Journey",
+            description="Transforming profile data into a compelling narrative structure",
+            order=4,
+            estimated_seconds=35,
+            critical=True,
+            dependencies=["task_003"],
+        ))
+        
+        # Task 5: Generate Timeline
+        tasks.append(Task(
+            task_id="task_005",
+            task_type=TaskType.GENERATE_TIMELINE,
+            name="Generating Timeline",
+            description="Creating interactive timeline visualization data",
+            order=5,
+            estimated_seconds=45,
+            critical=True,
+            dependencies=["task_004"],
+        ))
+        
+        # Task 6: Generate Documentary
+        tasks.append(Task(
+            task_id="task_006",
+            task_type=TaskType.GENERATE_DOCUMENTARY,
+            name="Creating Documentary",
+            description="Crafting documentary narrative and video segments",
+            order=6,
+            estimated_seconds=60,
+            critical=True,
+            dependencies=["task_004", "task_005"],
+        ))
+        
+        return tasks
+    
+    async def execute_plan(self, job_id: str) -> None:
+        """Execute the task plan for a job.
+        
+        Runs tasks in order, respecting dependencies, and broadcasts
+        progress updates via registered callbacks.
+        
+        Args:
+            job_id: The job ID to execute
+        """
+        plan = self._active_plans.get(job_id)
+        if not plan:
+            logger.error(f"No plan found for job {job_id}")
+            return
+        
+        plan.status = TaskStatus.RUNNING
+        await self._broadcast_update(job_id, "plan_started", plan.to_dict())
+        
+        try:
+            # Execute tasks in order
+            for task in sorted(plan.tasks, key=lambda t: t.order):
+                # Check dependencies
+                if not self._dependencies_satisfied(plan, task):
+                    logger.warning(f"Dependencies not met for task {task.task_id}, skipping")
+                    task.status = TaskStatus.SKIPPED
+                    continue
+                
+                # Execute the task
+                plan.current_task_id = task.task_id
+                await self._execute_task(job_id, plan, task)
+                
+                # Update overall progress
+                completed = sum(1 for t in plan.tasks if t.status == TaskStatus.COMPLETED)
+                plan.progress = int((completed / len(plan.tasks)) * 100)
+                
+                # Check for critical failure
+                if task.status == TaskStatus.FAILED and task.critical:
+                    logger.error(f"Critical task {task.task_id} failed, aborting plan")
+                    plan.status = TaskStatus.FAILED
+                    break
+            
+            # Mark plan as completed if no critical failures
+            if plan.status != TaskStatus.FAILED:
+                plan.status = TaskStatus.COMPLETED
+                plan.progress = 100
+                plan.completed_at = datetime.utcnow()
+            
+            await self._broadcast_update(job_id, "plan_completed", plan.to_dict())
+            
+        except Exception as e:
+            logger.error(f"Plan execution failed for job {job_id}: {e}")
+            plan.status = TaskStatus.FAILED
+            await self._broadcast_update(job_id, "plan_failed", {
+                "error": str(e),
+                "plan": plan.to_dict()
+            })
+    
+    async def _execute_task(self, job_id: str, plan: TaskPlan, task: Task) -> None:
+        """Execute a single task.
+        
+        Args:
+            job_id: The job ID
+            plan: The task plan
+            task: The task to execute
+        """
+        task.status = TaskStatus.RUNNING
+        task.started_at = datetime.utcnow()
+        task.message = "Starting..."
+        
+        await self._broadcast_update(job_id, "task_started", {
+            "task": task.to_dict(),
+            "plan_progress": plan.progress
+        })
+        
+        try:
+            # Route to appropriate handler based on task type
+            handler = self._get_task_handler(task.task_type)
+            result = await handler(job_id, plan, task)
+            
+            task.outputs = result
+            task.status = TaskStatus.COMPLETED
+            task.progress = 100
+            task.completed_at = datetime.utcnow()
+            task.message = "Completed successfully"
+            
+            # Store result in plan
+            plan.result_data[task.task_type.value] = result
+            
+            await self._broadcast_update(job_id, "task_completed", {
+                "task": task.to_dict(),
+                "plan_progress": plan.progress
+            })
+            
+        except Exception as e:
+            logger.error(f"Task {task.task_id} failed: {e}")
+            
+            # Retry logic
+            if task.retry_count < task.max_retries:
+                task.retry_count += 1
+                task.message = f"Retrying ({task.retry_count}/{task.max_retries})..."
+                await self._broadcast_update(job_id, "task_retrying", task.to_dict())
+                await asyncio.sleep(2 ** task.retry_count)  # Exponential backoff
+                await self._execute_task(job_id, plan, task)
+            else:
+                task.status = TaskStatus.FAILED
+                task.error = str(e)
+                task.message = f"Failed: {str(e)}"
+                await self._broadcast_update(job_id, "task_failed", task.to_dict())
+    
+    def _get_task_handler(self, task_type: TaskType) -> Callable:
+        """Get the handler function for a task type."""
+        handlers = {
+            TaskType.FETCH_PROFILE: self._handle_fetch_profile,
+            TaskType.ENRICH_PROFILE: self._handle_enrich_profile,
+            TaskType.AGGREGATE_HISTORY: self._handle_aggregate_history,
+            TaskType.STRUCTURE_JOURNEY: self._handle_structure_journey,
+            TaskType.GENERATE_TIMELINE: self._handle_generate_timeline,
+            TaskType.GENERATE_DOCUMENTARY: self._handle_generate_documentary,
+            TaskType.GENERATE_VIDEO: self._handle_generate_video,
+        }
+        return handlers.get(task_type, self._handle_unknown)
+    
+    def _dependencies_satisfied(self, plan: TaskPlan, task: Task) -> bool:
+        """Check if all dependencies for a task are satisfied."""
+        for dep_id in task.dependencies:
+            dep_task = next((t for t in plan.tasks if t.task_id == dep_id), None)
+            if dep_task and dep_task.status not in [TaskStatus.COMPLETED, TaskStatus.SKIPPED]:
+                return False
+        return True
+    
+    # Task Handlers
+    async def _handle_fetch_profile(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle profile fetching task."""
+        task.message = "Analyzing profile with Gemini 3..."
+        task.progress = 20
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        if not self.genai_client:
+            raise Exception("Gemini client not initialized")
+        
+        prompt = get_profile_extraction_prompt(plan.source_url)
+        
+        task.progress = 40
+        task.message = "Extracting structured data..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        response = await asyncio.to_thread(
+            self.genai_client.models.generate_content,
+            model="gemini-3-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[{"url_context": {}}, {"google_search": {}}],
+                response_mime_type="application/json",
+                response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                thinking_config=types.ThinkingConfig(thinking_level="high")
+            )
+        )
+        
+        task.progress = 80
+        task.message = "Processing response..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        result = self._parse_json_response(response.text)
+        result['source_url'] = plan.source_url
+        result['extraction_timestamp'] = datetime.utcnow().isoformat()
+        
+        return result
+    
+    async def _handle_enrich_profile(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle profile enrichment task."""
+        task.message = "Discovering additional sources..."
+        task.progress = 30
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Get profile data from previous task
+        profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value, {})
+        
+        # Check for additional URLs to enrich from
+        additional_urls = []
+        if profile_data.get('website'):
+            additional_urls.append(profile_data['website'])
+        if profile_data.get('github'):
+            additional_urls.append(profile_data['github'])
+        
+        task.progress = 60
+        task.message = f"Found {len(additional_urls)} additional sources"
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # For now, return the profile data with enrichment metadata
+        # Enhance implementation, would aggregate from additional URLs
+        enriched = {**profile_data, "enriched": True, "sources_checked": len(additional_urls)}
+        
+        return enriched
+    
+    async def _handle_aggregate_history(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle history aggregation task.
+        
+        Checks for existing profile history using guest_id and aggregates with Gemini 3 if found.
+        """
+        from app.db.session import get_db
+        from app.models.user import User, ProfileHistory
+        from sqlalchemy import select
+        
+        task.message = "Checking for existing profile history..."
+        task.progress = 20
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Get enriched profile data from previous task
+        profile_data = plan.result_data.get(TaskType.ENRICH_PROFILE.value, {})
+        
+        # Get guest_user_id and current history_id from plan options
+        guest_user_id = plan.options.get('guest_user_id')
+        current_history_id = plan.options.get('history_id')
+        user_id = plan.options.get('user_id')
+        
+        if not guest_user_id:
+            task.message = "No guest identifier found, skipping history check"
+            task.progress = 100
+            await self._broadcast_update(job_id, "task_progress", task.to_dict())
+            return {**profile_data, "history_checked": True, "aggregated": False}
+        
+        task.progress = 40
+        task.message = "Querying database for existing records..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Query database for existing history
+        async for db in get_db():
+            try:
+                # Find user by guest_id (more reliable than email)
+                user_query = select(User).where(User.guest_id == guest_user_id)
+                result = await db.execute(user_query)
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    # This shouldn't happen as user is created in profile_service
+                    # But handle gracefully
+                    task.message = "User not found, skipping history check"
+                    task.progress = 100
+                    await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                    return {**profile_data, "history_checked": True, "aggregated": False, "error": "User not found"}
+                
+                # Fetch all profile histories for this user EXCEPT the current one
+                task.progress = 60
+                task.message = f"Loading profile history for user..."
+                await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                
+                history_query = select(ProfileHistory).where(
+                    ProfileHistory.user_id == user.id
+                ).order_by(ProfileHistory.created_at.desc())
+                result = await db.execute(history_query)
+                all_histories = result.scalars().all()
+                
+                # Exclude the current history record (just created in profile_service)
+                histories = [h for h in all_histories if h.id != current_history_id]
+                
+                if not histories or len(histories) == 0:
+                    # No previous history found, this is the first record
+                    task.message = "First profile record for this user"
+                    task.progress = 100
+                    await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                    return {**profile_data, "history_checked": True, "aggregated": False, "first_record": True}
+                
+                # Aggregate with Gemini 3
+                task.progress = 70
+                task.message = f"Aggregating {len(histories)} previous records with Gemini 3..."
+                await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                
+                if not self.genai_client:
+                    raise Exception("Gemini client not initialized")
+                
+                # Prepare aggregation prompt
+                previous_profiles = [
+                    {
+                        "source": h.source_url,
+                        "data": h.structured_data,
+                        "date": h.created_at.isoformat()
+                    }
+                    for h in histories
+                ]
+                
+                aggregation_prompt = self._create_aggregation_prompt(
+                    current_profile=profile_data,
+                    previous_profiles=previous_profiles
+                )
+                
+                task.progress = 80
+                task.message = "Processing aggregation with Gemini 3 Flash..."
+                await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=aggregation_prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        thinking_config=types.ThinkingConfig(thinking_level="medium")
+                    )
+                )
+                
+                aggregated_data = self._parse_json_response(response.text)
+                
+                # Update the current history record with aggregated data
+                if current_history_id:
+                    current_history = await db.get(ProfileHistory, current_history_id)
+                    if current_history:
+                        current_history.structured_data = aggregated_data
+                        current_history.raw_data = profile_data
+                        await db.commit()
+                
+                task.progress = 100
+                task.message = "Successfully aggregated profile history"
+                await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                
+                return {
+                    **aggregated_data,
+                    "history_checked": True,
+                    "aggregated": True,
+                    "previous_records": len(histories),
+                    "aggregation_timestamp": datetime.utcnow().isoformat()
+                }
+                
+            except Exception as e:
+                logger.error(f"Error aggregating history: {e}")
+                await db.rollback()
+                # Return profile data without aggregation on error
+                return {**profile_data, "history_checked": True, "aggregated": False, "error": str(e)}
+            finally:
+                break  # Exit after first iteration
+    
+    async def _handle_structure_journey(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle journey structuring task."""
+        task.message = "Creating narrative structure..."
+        task.progress = 20
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        if not self.genai_client:
+            raise Exception("Gemini client not initialized")
+        
+        profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value, {})
+        prompt = get_journey_structuring_prompt(profile_data)
+        
+        task.progress = 50
+        task.message = "Generating journey chapters..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        response = await asyncio.to_thread(
+            self.genai_client.models.generate_content,
+            model="gemini-3-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
+                thinking_config=types.ThinkingConfig(thinking_level="medium")
+            )
+        )
+        
+        task.progress = 80
+        task.message = "Finalizing journey structure..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        return self._parse_json_response(response.text)
+    
+    async def _handle_generate_timeline(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle timeline generation task."""
+        task.message = "Building interactive timeline..."
+        task.progress = 30
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        if not self.genai_client:
+            raise Exception("Gemini client not initialized")
+        
+        journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
+        prompt = get_timeline_generation_prompt(journey_data)
+        
+        task.progress = 60
+        task.message = "Generating timeline events..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        response = await asyncio.to_thread(
+            self.genai_client.models.generate_content,
+            model="gemini-3-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=TIMELINE_SCHEMA,
+                thinking_config=types.ThinkingConfig(thinking_level="low")
+            )
+        )
+        
+        return self._parse_json_response(response.text)
+    
+    async def _handle_generate_documentary(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle documentary narrative generation task."""
+        task.message = "Crafting documentary narrative..."
+        task.progress = 20
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        if not self.genai_client:
+            raise Exception("Gemini client not initialized")
+        
+        journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
+        profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value, {})
+        prompt = get_documentary_narrative_prompt(journey_data, profile_data)
+        
+        task.progress = 50
+        task.message = "Writing video segments..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        response = await asyncio.to_thread(
+            self.genai_client.models.generate_content,
+            model="gemini-3-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=DOCUMENTARY_SCHEMA,
+                thinking_config=types.ThinkingConfig(thinking_level="high")
+            )
+        )
+        
+        task.progress = 80
+        task.message = "Finalizing documentary structure..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        return self._parse_json_response(response.text)
+    
+    async def _handle_generate_video(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle video generation task using Veo 3.1."""
+        task.message = "Preparing video generation (Veo 3.1)..."
+        task.progress = 30
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Video generation would use Veo 3.1 API
+        # For now, return placeholder indicating video is ready for generation
+        documentary_data = plan.result_data.get(TaskType.GENERATE_DOCUMENTARY.value, {})
+        
+        return {
+            "video_ready": False,
+            "segments_prepared": len(documentary_data.get("segments", [])),
+            "estimated_duration": documentary_data.get("duration_estimate", "60-90 seconds"),
+            "status": "Video generation queued for Veo 3.1"
+        }
+    
+    async def _handle_unknown(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
+        """Handle unknown task types."""
+        logger.warning(f"Unknown task type: {task.task_type}")
+        return {"warning": "Unknown task type"}
+    
+    def _create_aggregation_prompt(self, current_profile: Dict[str, Any], previous_profiles: List[Dict[str, Any]]) -> str:
+        """Create prompt for profile aggregation with Gemini 3."""
+        return f"""You are an expert at aggregating and enriching professional profile data.
+
+**Current Profile Data:**
+```json
+{json.dumps(current_profile, indent=2)}
+```
+
+**Previous Profile Records ({len(previous_profiles)} records):**
+```json
+{json.dumps(previous_profiles, indent=2)}
+```
+
+**Task:**
+Aggregate and merge all profile data to create the most comprehensive and accurate professional profile. Follow these guidelines:
+
+1. **Chronological Integration**: Merge experiences, projects, and achievements chronologically
+2. **Skill Evolution**: Track skill development and new technologies learned over time
+3. **Career Progression**: Identify career growth patterns and trajectory
+4. **Completeness**: Fill gaps using information from different records
+5. **Accuracy**: Prefer most recent data for current information, but preserve historical context
+6. **Deduplication**: Remove duplicate entries while preserving unique details
+7. **Enrichment**: Add insights about growth, patterns, and evolution
+
+**Output Requirements:**
+Return a JSON object with the aggregated profile containing:
+- All unique experiences (with date ranges)
+- Complete skills list (with evolution timeline if possible)
+- All projects and achievements
+- Complete education history
+- Comprehensive contact information
+- Career insights and patterns identified
+- Metadata about the aggregation (sources count, date range, etc.)
+
+Ensure the output is comprehensive, accurate, and provides a complete picture of the professional journey.
+"""
+    
+    def _parse_json_response(self, text: str) -> Dict[str, Any]:
+        """Parse JSON response from Gemini, handling markdown code blocks."""
+        text = text.strip()
+        if text.startswith('```json'):
+            text = text[7:]
+        if text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        text = text.strip()
+        
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON: {e}")
+            return {}
+    
+    # Update Broadcasting
+    def register_callback(self, job_id: str, callback: Callable) -> None:
+        """Register a callback for task updates."""
+        if job_id not in self._update_callbacks:
+            self._update_callbacks[job_id] = set()
+        self._update_callbacks[job_id].add(callback)
+    
+    def unregister_callback(self, job_id: str, callback: Callable) -> None:
+        """Unregister a callback."""
+        if job_id in self._update_callbacks:
+            self._update_callbacks[job_id].discard(callback)
+    
+    async def _broadcast_update(self, job_id: str, event_type: str, data: Any) -> None:
+        """Broadcast update to all registered callbacks."""
+        callbacks = self._update_callbacks.get(job_id, set())
+        
+        update = {
+            "event": event_type,
+            "job_id": job_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": data
+        }
+        
+        for callback in callbacks:
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(update)
+                else:
+                    callback(update)
+            except Exception as e:
+                logger.error(f"Callback error for job {job_id}: {e}")
+    
+    # Plan Status
+    def get_plan(self, job_id: str) -> Optional[TaskPlan]:
+        """Get the plan for a job."""
+        return self._active_plans.get(job_id)
+    
+    def get_plan_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get the status of a plan."""
+        plan = self._active_plans.get(job_id)
+        if plan:
+            return plan.to_dict()
+        return None
+
+
+# Global orchestrator instance
+task_orchestrator = TaskOrchestrator()

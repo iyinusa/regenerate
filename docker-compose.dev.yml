@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # reGen API Server (Development)
   regen-api-dev:
