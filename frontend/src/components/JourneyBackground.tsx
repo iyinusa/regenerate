@@ -12,8 +12,11 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
+  const atmosphericParticlesRef = useRef<THREE.Points | null>(null);
+  const shapesRef = useRef<THREE.Mesh[]>([]);
   const frameIdRef = useRef<number>(0);
-  const themeRef = useRef<'day' | 'night'>('night');
+  const mouseXRef = useRef(0);
+  const mouseYRef = useRef(0);
 
   // Determine initial theme based on time
   const [theme] = useState<'day' | 'night'>(() => {
@@ -21,206 +24,249 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     return (hour >= 6 && hour < 18) ? 'day' : 'night';
   });
 
+  // Section color configurations
+  const sectionColors = [
+    { primary: 0x00d4ff, secondary: 0x0099cc }, // Hero - Cyan
+    { primary: 0x7b2ff7, secondary: 0x5a1fd6 }, // Timeline - Purple
+    { primary: 0xff2e97, secondary: 0xcc2579 }, // Experience - Pink
+    { primary: 0x00ff88, secondary: 0x00cc6a }, // Skills - Green
+    { primary: 0xffaa00, secondary: 0xcc8800 }, // Projects - Orange
+    { primary: 0xff4444, secondary: 0xcc3636 }, // Documentary - Red
+  ];
+
   useEffect(() => {
     if (!containerRef.current) return;
-    
-    // Update ref for animation loop access
-    themeRef.current = theme;
 
     // Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Fog for depth - adapts to theme
-    const fogColor = theme === 'day' ? 0xf0f5ff : 0x050510;
-    scene.fog = new THREE.FogExp2(fogColor, 0.02);
+    const bgColor = theme === 'day' ? 0x0a1628 : 0x050510;
+    scene.fog = new THREE.FogExp2(bgColor, 0.008);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(
-      75,
+      60,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000
+      2000
     );
-    camera.position.z = 30;
+    camera.position.set(0, 0, 100);
     cameraRef.current = camera;
 
-    // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
-      alpha: true 
+    // Renderer setup - simple and proven approach
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    
-    // Clear color matches fog
-    renderer.setClearColor(fogColor, 1); 
+    renderer.setClearColor(bgColor, 1);
     
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Create particle system
-    const particlesGeometry = new THREE.BufferGeometry();
-    const particlesCount = 5000;
-    const posArray = new Float32Array(particlesCount * 3);
-    const colorArray = new Float32Array(particlesCount * 3);
+    // Create main particle system
+    const createParticles = () => {
+      const geometry = new THREE.BufferGeometry();
+      const count = 6000;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
 
-    for (let i = 0; i < particlesCount * 3; i += 3) {
-      posArray[i] = (Math.random() - 0.5) * 100;
-      posArray[i + 1] = (Math.random() - 0.5) * 100;
-      posArray[i + 2] = (Math.random() - 0.5) * 100;
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        
+        // Spherical distribution
+        const radius = 50 + Math.random() * 150;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        
+        positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[i3 + 2] = radius * Math.cos(phi);
 
-      // Color gradient
-      // Day: Blue/Teal/Gold cues
-      // Night: Cyan/Purple/Pink cues
-      const t = Math.random();
-      if (theme === 'day') {
-         // Silvery/Blue for day
-         colorArray[i] = 0.1 + t * 0.2; // R
-         colorArray[i + 1] = 0.3 + t * 0.4; // G
-         colorArray[i + 2] = 0.8 + t * 0.2; // B
-      } else {
-         // Neon for night
-         colorArray[i] = 0.0 + t * 0.48; // R
-         colorArray[i + 1] = 0.83 - t * 0.64; // G
-         colorArray[i + 2] = 1.0 - t * 0.03; // B
+        // Color based on section
+        const colorConfig = sectionColors[activeSection] || sectionColors[0];
+        const color = new THREE.Color(Math.random() > 0.5 ? colorConfig.primary : colorConfig.secondary);
+        const intensity = 0.5 + Math.random() * 0.5;
+        
+        colors[i3] = color.r * intensity;
+        colors[i3 + 1] = color.g * intensity;
+        colors[i3 + 2] = color.b * intensity;
       }
-    }
 
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const particlesMaterial = new THREE.PointsMaterial({
-      size: theme === 'day' ? 0.2 : 0.15, // Slightly larger particles in day to be visible
-      vertexColors: true,
-      transparent: true,
-      opacity: theme === 'day' ? 0.9 : 0.8,
-      // Use NormalBlending for Day so they show up against light bg, Additive for Night
-      blending: theme === 'day' ? THREE.NormalBlending : THREE.AdditiveBlending,
-    });
+      const material = new THREE.PointsMaterial({
+        size: 1.2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true
+      });
 
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
-    particlesRef.current = particles;
+      const particles = new THREE.Points(geometry, material);
+      scene.add(particles);
+      particlesRef.current = particles;
+    };
 
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(
-      theme === 'day' ? 0xffffff : 0x404040, 
-      theme === 'day' ? 1.5 : 2
-    );
-    scene.add(ambientLight);
+    // Create atmospheric dust particles
+    const createAtmosphericParticles = () => {
+      const geometry = new THREE.BufferGeometry();
+      const count = 2000;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
 
-    // Add directional light (Sun/Moon)
-    const directionalLight = new THREE.DirectionalLight(
-      theme === 'day' ? 0xffaa00 : 0x00d4ff, 
-      1
-    );
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        positions[i3] = (Math.random() - 0.5) * 400;
+        positions[i3 + 1] = (Math.random() - 0.5) * 400;
+        positions[i3 + 2] = (Math.random() - 0.5) * 200;
 
-    // Add point lights for dynamic glow
-    const pointLight1 = new THREE.PointLight(
-      theme === 'day' ? 0x0088ff : 0x00d4ff, 
-      2, 
-      50
-    );
-    pointLight1.position.set(10, 10, 10);
-    scene.add(pointLight1);
+        const intensity = 0.2 + Math.random() * 0.3;
+        colors[i3] = intensity;
+        colors[i3 + 1] = intensity;
+        colors[i3 + 2] = intensity;
+      }
 
-    const pointLight2 = new THREE.PointLight(
-      theme === 'day' ? 0xff8800 : 0x7b2ff7, 
-      2, 
-      50
-    );
-    pointLight2.position.set(-10, -10, -10);
-    scene.add(pointLight2);
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending
+      });
+
+      const particles = new THREE.Points(geometry, material);
+      scene.add(particles);
+      atmosphericParticlesRef.current = particles;
+    };
 
     // Create floating geometric shapes
-    const geometries = [
-      new THREE.TetrahedronGeometry(2, 0),
-      new THREE.OctahedronGeometry(1.5, 0),
-      new THREE.IcosahedronGeometry(1.8, 0),
-    ];
+    const createShapes = () => {
+      const geometries = [
+        new THREE.TetrahedronGeometry(3, 0),
+        new THREE.OctahedronGeometry(2.5, 0),
+        new THREE.IcosahedronGeometry(2.8, 0),
+        new THREE.DodecahedronGeometry(2.2, 0),
+      ];
 
-    const shapeMaterial = new THREE.MeshPhongMaterial({
-      color: theme === 'day' ? 0x224488 : 0x00d4ff,
-      transparent: true,
-      opacity: 0.3,
-      wireframe: true,
-    });
+      geometries.forEach((geometry, index) => {
+        const colorConfig = sectionColors[activeSection] || sectionColors[0];
+        const material = new THREE.MeshBasicMaterial({
+          color: index % 2 === 0 ? colorConfig.primary : colorConfig.secondary,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.4
+        });
 
-    const shapes: THREE.Mesh[] = [];
-    geometries.forEach((geometry) => {
-      const mesh = new THREE.Mesh(geometry, shapeMaterial);
-      mesh.position.set(
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 40
-      );
-      scene.add(mesh);
-      shapes.push(mesh);
-    });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(
+          (Math.random() - 0.5) * 80,
+          (Math.random() - 0.5) * 80,
+          (Math.random() - 0.5) * 40
+        );
+        mesh.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI
+        );
 
-    // Mouse movement for parallax
-    let mouseX = 0;
-    let mouseY = 0;
+        scene.add(mesh);
+        shapesRef.current.push(mesh);
 
+        // Animate rotation
+        gsap.to(mesh.rotation, {
+          x: mesh.rotation.x + Math.PI * 2,
+          y: mesh.rotation.y + Math.PI * 2,
+          duration: 15 + Math.random() * 10,
+          repeat: -1,
+          ease: 'none'
+        });
+      });
+    };
+
+    // Add lights
+    const addLights = () => {
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+      scene.add(ambientLight);
+
+      const colorConfig = sectionColors[activeSection] || sectionColors[0];
+      
+      const pointLight1 = new THREE.PointLight(colorConfig.primary, 2, 200);
+      pointLight1.position.set(50, 50, 50);
+      scene.add(pointLight1);
+
+      const pointLight2 = new THREE.PointLight(colorConfig.secondary, 1.5, 200);
+      pointLight2.position.set(-50, -50, 50);
+      scene.add(pointLight2);
+    };
+
+    createParticles();
+    createAtmosphericParticles();
+    createShapes();
+    addLights();
+
+    // Mouse movement handler
     const handleMouseMove = (event: MouseEvent) => {
-      mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-      mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+      mouseXRef.current = (event.clientX / window.innerWidth) * 2 - 1;
+      mouseYRef.current = -(event.clientY / window.innerHeight) * 2 + 1;
+    };
+
+    // Resize handler
+    const handleResize = () => {
+      if (!camera || !renderer) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-
-    // Handle window resize
-    const handleResize = () => {
-      if (!cameraRef.current || !rendererRef.current) return;
-      
-      cameraRef.current.aspect = window.innerWidth / window.innerHeight;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(window.innerWidth, window.innerHeight);
-    };
-
     window.addEventListener('resize', handleResize);
 
     // Animation loop
     let time = 0;
     const animate = () => {
       frameIdRef.current = requestAnimationFrame(animate);
-      time += 0.001;
+      time += 0.01;
 
+      // Rotate main particles
       if (particlesRef.current) {
-        particlesRef.current.rotation.y = time * 0.5;
-        particlesRef.current.rotation.x = time * 0.3;
+        particlesRef.current.rotation.y += 0.001;
+        particlesRef.current.rotation.x += 0.0005;
+        
+        // Pulsing opacity
+        const material = particlesRef.current.material as THREE.PointsMaterial;
+        material.opacity = 0.6 + Math.sin(time * 2) * 0.2;
       }
 
-      // Animate geometric shapes
-      shapes.forEach((shape, i) => {
-        shape.rotation.x += 0.005 * (i + 1);
-        shape.rotation.y += 0.003 * (i + 1);
-        shape.position.y = Math.sin(time * 2 + i) * 2;
+      // Animate atmospheric particles
+      if (atmosphericParticlesRef.current) {
+        atmosphericParticlesRef.current.rotation.y -= 0.0003;
+        atmosphericParticlesRef.current.position.x = Math.sin(time * 0.5) * 5;
+      }
+
+      // Animate shapes
+      shapesRef.current.forEach((shape, i) => {
+        shape.position.y += Math.sin(time + i) * 0.02;
+        const material = shape.material as THREE.MeshBasicMaterial;
+        material.opacity = 0.3 + Math.sin(time * 2 + i) * 0.15;
       });
 
-      // Camera parallax based on mouse
-      if (cameraRef.current) {
-        gsap.to(cameraRef.current.position, {
-          x: mouseX * 2,
-          y: mouseY * 2,
-          duration: 1,
-          ease: 'power2.out',
-        });
-        cameraRef.current.lookAt(scene.position);
+      // Camera parallax
+      if (camera) {
+        camera.position.x += (mouseXRef.current * 10 - camera.position.x) * 0.02;
+        camera.position.y += (mouseYRef.current * 10 - camera.position.y) * 0.02;
+        camera.lookAt(scene.position);
       }
 
-      // Animate point lights
-      pointLight1.position.x = Math.sin(time * 2) * 10;
-      pointLight1.position.z = Math.cos(time * 2) * 10;
-      pointLight2.position.x = Math.cos(time * 1.5) * 10;
-      pointLight2.position.z = Math.sin(time * 1.5) * 10;
-
-      if (rendererRef.current && cameraRef.current) {
-        rendererRef.current.render(scene, cameraRef.current);
-      }
+      renderer.render(scene, camera);
     };
 
     animate();
@@ -231,71 +277,78 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameIdRef.current);
       
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      if (containerRef.current && renderer.domElement) {
+        containerRef.current.removeChild(renderer.domElement);
       }
       
-      particlesGeometry.dispose();
-      particlesMaterial.dispose();
-      geometries.forEach(g => g.dispose());
-      shapeMaterial.dispose();
-      rendererRef.current?.dispose();
+      renderer.dispose();
+      
+      // Dispose geometries and materials
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => m.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        }
+        if (child instanceof THREE.Points) {
+          child.geometry?.dispose();
+          (child.material as THREE.Material)?.dispose();
+        }
+      });
     };
   }, [theme]);
 
-  // Update scene based on active section
+  // Update colors when section changes
   useEffect(() => {
-    if (!particlesRef.current) return;
+    if (!particlesRef.current || !sceneRef.current) return;
 
-    const colors = [
-      [0.0, 0.83, 1.0], // Cyan
-      [0.48, 0.19, 0.97], // Purple
-      [1.0, 0.18, 0.59], // Pink
-      [0.0, 0.83, 1.0], // Cyan
-      [0.48, 0.19, 0.97], // Purple
-      [1.0, 0.18, 0.59], // Pink
-    ];
+    const colorConfig = sectionColors[activeSection] || sectionColors[0];
+    const primaryColor = new THREE.Color(colorConfig.primary);
+    const secondaryColor = new THREE.Color(colorConfig.secondary);
 
-    const targetColor = colors[activeSection] || colors[0];
-    
-    gsap.to(sceneRef.current?.fog || {}, {
-      duration: 1.5,
-      ease: 'power2.inOut',
-    });
-
-    // Animate particle colors
-    const colorAttribute = particlesRef.current.geometry.getAttribute('color');
-    const colorArray = colorAttribute.array as Float32Array;
+    // Update particle colors
+    const colors = particlesRef.current.geometry.getAttribute('color');
+    const colorArray = colors.array as Float32Array;
     
     for (let i = 0; i < colorArray.length; i += 3) {
-      const t = (i / colorArray.length) + Math.random() * 0.2;
+      const color = Math.random() > 0.5 ? primaryColor : secondaryColor;
+      const intensity = 0.5 + Math.random() * 0.5;
+      
       gsap.to(colorArray, {
-        [i]: targetColor[0] + t * 0.2,
-        [i + 1]: targetColor[1] - t * 0.2,
-        [i + 2]: targetColor[2],
+        [i]: color.r * intensity,
+        [i + 1]: color.g * intensity,
+        [i + 2]: color.b * intensity,
         duration: 2,
         ease: 'power2.inOut',
         onUpdate: () => {
-          colorAttribute.needsUpdate = true;
-        },
+          colors.needsUpdate = true;
+        }
       });
     }
+
+    // Update shape colors
+    shapesRef.current.forEach((shape, index) => {
+      const material = shape.material as THREE.MeshBasicMaterial;
+      const targetColor = index % 2 === 0 ? colorConfig.primary : colorConfig.secondary;
+      gsap.to(material.color, {
+        r: new THREE.Color(targetColor).r,
+        g: new THREE.Color(targetColor).g,
+        b: new THREE.Color(targetColor).b,
+        duration: 1.5,
+        ease: 'power2.inOut'
+      });
+    });
   }, [activeSection]);
 
   return (
     <div
       ref={containerRef}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1,
-        pointerEvents: 'none',
-        backgroundColor: theme === 'day' ? '#f0f5ff' : '#050510',
-        transition: 'background-color 2s ease-in-out',
-      }}
+      className="three-container journey-bg"
     />
   );
 };

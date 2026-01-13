@@ -1,12 +1,34 @@
-/* Journey Page Styles */
+/* Journey Page Styles with Performance Optimizations */
 .journey-page {
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background: #000;
+  background-color: #050510;
   color: #fff;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  /* Enhanced for cinematic experience */
+  image-rendering: optimizeQuality;
+  text-rendering: optimizeLegibility;
+}
+
+/* Three.js Background Container - same as Home page */
+.journey-page .three-container,
+.journey-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.journey-page .three-container canvas,
+.journey-bg canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .journey-page.loading,
@@ -54,11 +76,11 @@
 /* Journey Content */
 .journey-content {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   width: 100%;
 }
 
-/* Journey Sections */
+/* Enhanced Journey Sections with Cinematic Effects */
 .journey-section {
   min-height: 100vh;
   padding: 6rem 2rem;
@@ -67,25 +89,82 @@
   justify-content: center;
   position: relative;
   opacity: 0;
-  transform: translateY(50px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
+  transform: translateY(50px) scale(0.95);
+  transition: 
+    opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* Performance optimization */
+  will-change: opacity, transform;
 }
 
 .journey-section.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 .journey-section::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.4) 0%,
-    rgba(0, 0, 0, 0.6) 100%
-  );
+  background: 
+    radial-gradient(
+      ellipse at 50% 20%,
+      rgba(0, 212, 255, 0.1) 0%,
+      rgba(123, 47, 247, 0.05) 40%,
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.2) 0%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
   pointer-events: none;
+  animation: atmosphericShift 15s ease-in-out infinite;
+}
+
+@keyframes atmosphericShift {
+  0%, 100% {
+    background: 
+      radial-gradient(
+        ellipse at 50% 20%,
+        rgba(0, 212, 255, 0.1) 0%,
+        rgba(123, 47, 247, 0.05) 40%,
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.2) 0%,
+        rgba(0, 0, 0, 0.6) 100%
+      );
+  }
+  33% {
+    background: 
+      radial-gradient(
+        ellipse at 30% 30%,
+        rgba(123, 47, 247, 0.1) 0%,
+        rgba(255, 46, 151, 0.05) 40%,
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.2) 0%,
+        rgba(0, 0, 0, 0.6) 100%
+      );
+  }
+  66% {
+    background: 
+      radial-gradient(
+        ellipse at 70% 40%,
+        rgba(255, 46, 151, 0.1) 0%,
+        rgba(0, 255, 136, 0.05) 40%,
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.2) 0%,
+        rgba(0, 0, 0, 0.6) 100%
+      );
+  }
 }
 
 .section-container {
@@ -148,24 +227,134 @@
   50% { background-position: 100% 50%; }
 }
 
-/* Glow Effects */
+/* Enhanced Cinematic Glow Effects */
 .glow-text {
-  text-shadow: 0 0 20px rgba(0, 212, 255, 0.5),
-               0 0 40px rgba(123, 47, 247, 0.3);
+  text-shadow: 
+    0 0 10px rgba(0, 212, 255, 0.8),
+    0 0 20px rgba(0, 212, 255, 0.6),
+    0 0 40px rgba(123, 47, 247, 0.4),
+    0 0 80px rgba(255, 46, 151, 0.2);
+  animation: textGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes textGlow {
+  0% {
+    text-shadow: 
+      0 0 10px rgba(0, 212, 255, 0.8),
+      0 0 20px rgba(0, 212, 255, 0.6),
+      0 0 40px rgba(123, 47, 247, 0.4);
+  }
+  100% {
+    text-shadow: 
+      0 0 15px rgba(0, 212, 255, 1.0),
+      0 0 30px rgba(0, 212, 255, 0.8),
+      0 0 60px rgba(123, 47, 247, 0.6),
+      0 0 120px rgba(255, 46, 151, 0.3);
+  }
 }
 
 .card-glow {
-  box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1),
-              0 0 60px rgba(123, 47, 247, 0.05);
+  box-shadow: 
+    0 8px 32px rgba(0, 212, 255, 0.15),
+    0 0 60px rgba(123, 47, 247, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  animation: cardGlow 3s ease-in-out infinite alternate;
 }
 
-/* Glass Morphism */
+@keyframes cardGlow {
+  0% {
+    box-shadow: 
+      0 8px 32px rgba(0, 212, 255, 0.15),
+      0 0 60px rgba(123, 47, 247, 0.1);
+  }
+  100% {
+    box-shadow: 
+      0 12px 48px rgba(0, 212, 255, 0.25),
+      0 0 80px rgba(123, 47, 247, 0.2),
+      0 0 120px rgba(255, 46, 151, 0.1);
+  }
+}
+
+/* Enhanced Glass Morphism with Cinematic Effects */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(15px) saturate(180%);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
+  position: relative;
+}
+
+/* Only apply overflow:hidden to non-carousel glass elements */
+.glass:not(.achievement-carousel-card) {
+  overflow: hidden;
+}
+
+/* Disable sweep animation for carousel cards */
+.achievement-carousel-card.glass::before {
+  display: none !important;
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.5s;
+  z-index: 1;
+}
+
+.glass:hover::before {
+  left: 100%;
+}
+
+/* Cinematic Lighting Effects */
+.cinematic-shadow {
+  box-shadow: 
+    0 20px 40px -12px rgba(0, 0, 0, 0.7),
+    0 0 60px rgba(0, 212, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.volumetric-light {
+  position: relative;
+}
+
+.volumetric-light::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 212, 255, 0.1) 0%,
+    rgba(123, 47, 247, 0.05) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+  animation: lightPulse 6s ease-in-out infinite;
+}
+
+@keyframes lightPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.atmospheric-glow {
+  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.3))
+          drop-shadow(0 0 40px rgba(123, 47, 247, 0.2));
 }
 
 /* Mobile Responsive */

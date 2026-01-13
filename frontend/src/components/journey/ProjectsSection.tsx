@@ -15,6 +15,8 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
   const [isScrolling, setIsScrolling] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const mouseStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
 
   // Get unique project types for filtering
   const projectTypes = ['all', ...new Set(projects.map(p => p.type || p.category || 'other'))];
@@ -78,64 +80,112 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
     touchStartRef.current = null;
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    mouseStartRef.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = true;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !mouseStartRef.current) return;
+    
+    const deltaX = e.clientX - mouseStartRef.current.x;
+    const deltaY = e.clientY - mouseStartRef.current.y;
+    
+    // Only handle horizontal drags (ignore vertical scrolling)
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
+      if (deltaX > 0) {
+        throttledScroll('prev');
+      } else {
+        throttledScroll('next');
+      }
+      mouseStartRef.current = null;
+      isDraggingRef.current = false;
+    }
+  };
+
+  const handleMouseUp = () => {
+    mouseStartRef.current = null;
+    isDraggingRef.current = false;
+  };
+
+  const handleMouseLeave = () => {
+    mouseStartRef.current = null;
+    isDraggingRef.current = false;
+  };
+
   const getAchievementStyle = (index: number) => {
     if (!achievements.length) return {};
     
     const total = achievements.length;
-    let diff = (index - activeAchievement) % total;
-    if (diff < 0) diff += total;
-    if (diff > total / 2) diff -= total;
+    const position = index - activeAchievement;
     
-    const baseDistance = 280;
-    const rotateAngle = 35;
+    // Normalize position to handle wrapping
+    let normalizedPosition = position;
+    if (normalizedPosition > total / 2) normalizedPosition -= total;
+    if (normalizedPosition < -total / 2) normalizedPosition += total;
     
-    if (diff === 0) {
-      // Center (Active)
+    // Active card stays at center
+    if (normalizedPosition === 0) {
       return {
         x: 0,
         z: 0,
         scale: 1,
-        zIndex: 10,
         opacity: 1,
         rotateY: 0,
-        filter: 'brightness(1.1)',
+        filter: 'brightness(1.2) saturate(1.1)',
+        zIndex: 100,
         pointerEvents: 'auto'
       };
-    } else if (diff === -1 || (diff === total - 1)) {
-      // Left
+    }
+    
+    // Calculate positioning for other cards
+    const absPosition = Math.abs(normalizedPosition);
+    const side = normalizedPosition > 0 ? 1 : -1;
+    
+    // Distance multiplier based on position
+    const baseDistance = 300;
+    const distanceMultiplier = Math.min(absPosition, 3);
+    
+    const x = side * (baseDistance + (distanceMultiplier - 1) * 100);
+    const z = -150 * distanceMultiplier;
+    const rotateY = side * (25 + (distanceMultiplier - 1) * 10);
+    
+    // Visibility based on distance from center
+    if (absPosition === 1) {
+      // Immediate neighbors (left/right)
       return {
-        x: -baseDistance,
-        z: -150,
+        x,
+        z,
         scale: 0.8,
-        zIndex: 5,
-        opacity: 0.6,
-        rotateY: rotateAngle,
-        filter: 'brightness(0.6) blur(2px)',
+        opacity: 0.7,
+        rotateY,
+        filter: 'brightness(0.8) blur(1px)',
+        zIndex: 50,
         pointerEvents: 'auto'
       };
-    } else if (diff === 1 || (diff === -(total - 1))) {
-      // Right
+    } else if (absPosition === 2) {
+      // Second neighbors
       return {
-        x: baseDistance,
-        z: -150,
-        scale: 0.8,
-        zIndex: 5,
-        opacity: 0.6,
-        rotateY: -rotateAngle,
+        x,
+        z,
+        scale: 0.65,
+        opacity: 0.4,
+        rotateY,
         filter: 'brightness(0.6) blur(2px)',
+        zIndex: 25,
         pointerEvents: 'auto'
       };
     } else {
-      // Hidden cards
-      const side = diff > 0 ? 1 : -1;
+      // Far cards (hidden)
       return {
-        x: side * (baseDistance * 1.5),
-        z: -300,
-        scale: 0.5,
-        zIndex: 1,
-        opacity: 0.2,
-        rotateY: side * (rotateAngle + 20),
+        x: side * (baseDistance * 2),
+        z: -400,
+        scale: 0.4,
+        opacity: 0.1,
+        rotateY: side * 60,
         filter: 'brightness(0.3) blur(4px)',
+        zIndex: 1,
         pointerEvents: 'none'
       };
     }
@@ -278,6 +328,11 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
               onWheel={handleWheel}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              style={{ cursor: isDraggingRef.current ? 'grabbing' : 'grab' }}
             >
               <div className="achievements-carousel-container">
                 <AnimatePresence mode="popLayout">
