@@ -89,7 +89,35 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, sectionI
     const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
-      .attr('height', height);
+      .attr('height', height)
+      .style('overflow', 'visible');
+
+    // Define colors and categories
+    const domains = ['Technical', 'Leadership', 'Tools', 'Soft Skills', 'Other'];
+    const colors = ['#00d4ff', '#7b2ff7', '#ff2e97', '#00ff88', '#ffaa00'];
+    const colorScale = d3.scaleOrdinal().domain(domains).range(colors);
+
+    // Definitions for gradients and filters
+    const defs = svg.append('defs');
+    
+    // Glow filter
+    const filter = defs.append('filter').attr('id', 'glow');
+    filter.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur');
+    const feMerge = filter.append('feMerge');
+    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+    // Radial gradients for 3D sphere effect
+    colors.forEach((c, i) => {
+      const grad = defs.append('radialGradient')
+        .attr('id', `grad-${i}`)
+        .attr('cx', '35%')
+        .attr('cy', '35%')
+        .attr('r', '60%');
+      grad.append('stop').attr('offset', '0%').attr('stop-color', '#ffffff').attr('stop-opacity', 0.9);
+      grad.append('stop').attr('offset', '40%').attr('stop-color', c).attr('stop-opacity', 0.9);
+      grad.append('stop').attr('offset', '100%').attr('stop-color', d3.color(c)?.darker(0.5).toString() || c).attr('stop-opacity', 1);
+    });
 
     // Prepare data
     const data = skills.map((skill) => ({
@@ -98,19 +126,16 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, sectionI
       category: getSkillCategory(skill),
     }));
 
-    const colorScale = d3.scaleOrdinal()
-      .domain(['Technical', 'Leadership', 'Tools', 'Soft Skills', 'Other'])
-      .range(['#00d4ff', '#7b2ff7', '#ff2e97', '#00ff88', '#ffaa00']);
-
     // Create pack layout
     const pack = d3.pack()
       .size([width, height])
-      .padding(3);
+      .padding(5);
 
     const root = d3.hierarchy({ children: data } as any)
       .sum((d: any) => d.value);
 
-    const nodes = pack(root as any).leaves();
+    // @ts-ignore
+    const nodes = pack(root).leaves();
 
     // Create bubbles
     const bubbles = svg.selectAll('.bubble')
@@ -122,31 +147,36 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, sectionI
 
     bubbles.append('circle')
       .attr('r', (d: any) => d.r)
-      .attr('fill', (d: any) => colorScale(d.data.category) as string)
-      .attr('opacity', 0.7)
+      .attr('fill', (d: any) => {
+         const idx = domains.indexOf(d.data.category);
+         return `url(#grad-${idx !== -1 ? idx : 4})`;
+      })
+      .style('filter', 'url(#glow)')
       .attr('stroke', (d: any) => colorScale(d.data.category) as string)
-      .attr('stroke-width', 2)
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.5)
       .style('cursor', 'pointer')
       .on('mouseenter', function() {
         d3.select(this)
           .transition()
-          .duration(200)
-          .attr('opacity', 1)
-          .attr('stroke-width', 3);
+          .duration(300)
+          .attr('transform', 'scale(1.1)')
+          .style('filter', 'brightness(1.3) url(#glow)');
       })
       .on('mouseleave', function() {
         d3.select(this)
           .transition()
-          .duration(200)
-          .attr('opacity', 0.7)
-          .attr('stroke-width', 2);
+          .duration(300)
+          .attr('transform', 'scale(1)')
+          .style('filter', 'url(#glow)');
       });
 
     bubbles.append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '.3em')
       .style('fill', '#fff')
-      .style('font-size', (d: any) => `${Math.min(d.r / 3, 14)}px`)
+      .style('text-shadow', '0 2px 4px rgba(0,0,0,0.8)')
+      .style('font-size', (d: any) => `${Math.min(d.r / 2.5, 14)}px`)
       .style('font-weight', '600')
       .style('pointer-events', 'none')
       .text((d: any) => d.data.name);

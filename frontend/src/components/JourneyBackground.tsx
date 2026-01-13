@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 
@@ -13,13 +13,27 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
   const frameIdRef = useRef<number>(0);
+  const themeRef = useRef<'day' | 'night'>('night');
+
+  // Determine initial theme based on time
+  const [theme] = useState<'day' | 'night'>(() => {
+    const hour = new Date().getHours();
+    return (hour >= 6 && hour < 18) ? 'day' : 'night';
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
+    
+    // Update ref for animation loop access
+    themeRef.current = theme;
 
     // Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
+
+    // Fog for depth - adapts to theme
+    const fogColor = theme === 'day' ? 0xf0f5ff : 0x050510;
+    scene.fog = new THREE.FogExp2(fogColor, 0.02);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(
@@ -38,6 +52,10 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Clear color matches fog
+    renderer.setClearColor(fogColor, 1); 
+    
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -52,22 +70,33 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       posArray[i + 1] = (Math.random() - 0.5) * 100;
       posArray[i + 2] = (Math.random() - 0.5) * 100;
 
-      // Color gradient from cyan to purple
+      // Color gradient
+      // Day: Blue/Teal/Gold cues
+      // Night: Cyan/Purple/Pink cues
       const t = Math.random();
-      colorArray[i] = 0.0 + t * 0.48; // R
-      colorArray[i + 1] = 0.83 - t * 0.64; // G
-      colorArray[i + 2] = 1.0 - t * 0.03; // B
+      if (theme === 'day') {
+         // Silvery/Blue for day
+         colorArray[i] = 0.1 + t * 0.2; // R
+         colorArray[i + 1] = 0.3 + t * 0.4; // G
+         colorArray[i + 2] = 0.8 + t * 0.2; // B
+      } else {
+         // Neon for night
+         colorArray[i] = 0.0 + t * 0.48; // R
+         colorArray[i + 1] = 0.83 - t * 0.64; // G
+         colorArray[i + 2] = 1.0 - t * 0.03; // B
+      }
     }
 
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.15,
+      size: theme === 'day' ? 0.2 : 0.15, // Slightly larger particles in day to be visible
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending,
+      opacity: theme === 'day' ? 0.9 : 0.8,
+      // Use NormalBlending for Day so they show up against light bg, Additive for Night
+      blending: theme === 'day' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
 
     const particles = new THREE.Points(particlesGeometry, particlesMaterial);
@@ -75,20 +104,34 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     particlesRef.current = particles;
 
     // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    const ambientLight = new THREE.AmbientLight(
+      theme === 'day' ? 0xffffff : 0x404040, 
+      theme === 'day' ? 1.5 : 2
+    );
     scene.add(ambientLight);
 
-    // Add directional light
-    const directionalLight = new THREE.DirectionalLight(0x00d4ff, 1);
+    // Add directional light (Sun/Moon)
+    const directionalLight = new THREE.DirectionalLight(
+      theme === 'day' ? 0xffaa00 : 0x00d4ff, 
+      1
+    );
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
     // Add point lights for dynamic glow
-    const pointLight1 = new THREE.PointLight(0x00d4ff, 2, 50);
+    const pointLight1 = new THREE.PointLight(
+      theme === 'day' ? 0x0088ff : 0x00d4ff, 
+      2, 
+      50
+    );
     pointLight1.position.set(10, 10, 10);
     scene.add(pointLight1);
 
-    const pointLight2 = new THREE.PointLight(0x7b2ff7, 2, 50);
+    const pointLight2 = new THREE.PointLight(
+      theme === 'day' ? 0xff8800 : 0x7b2ff7, 
+      2, 
+      50
+    );
     pointLight2.position.set(-10, -10, -10);
     scene.add(pointLight2);
 
@@ -100,7 +143,7 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     ];
 
     const shapeMaterial = new THREE.MeshPhongMaterial({
-      color: 0x00d4ff,
+      color: theme === 'day' ? 0x224488 : 0x00d4ff,
       transparent: true,
       opacity: 0.3,
       wireframe: true,
@@ -198,7 +241,7 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       shapeMaterial.dispose();
       rendererRef.current?.dispose();
     };
-  }, []);
+  }, [theme]);
 
   // Update scene based on active section
   useEffect(() => {
@@ -250,6 +293,8 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
         height: '100%',
         zIndex: 1,
         pointerEvents: 'none',
+        backgroundColor: theme === 'day' ? '#f0f5ff' : '#050510',
+        transition: 'background-color 2s ease-in-out',
       }}
     />
   );

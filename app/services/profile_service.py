@@ -182,12 +182,14 @@ class ProfileExtractionService:
                         "status": ProfileStatus.COMPLETED,
                         "progress": 100,
                         "message": "Profile extraction completed successfully",
+                        "completed_at": datetime.now().isoformat(),
                     })
                 
                 elif event == "plan_failed" or event == "task_failed":
                     profile_jobs[job_id].update({
                         "status": ProfileStatus.FAILED,
                         "error": data.get("error", "Unknown error"),
+                        "failed_at": datetime.now().isoformat(),
                     })
             
             # Register callback
@@ -225,6 +227,7 @@ class ProfileExtractionService:
                         "status": ProfileStatus.COMPLETED,
                         "progress": 100,
                         "message": "Profile extraction completed successfully",
+                        "completed_at": datetime.now().isoformat(),
                         "data": profile_data,
                         "journey": journey_data,
                         "timeline": timeline_data,
@@ -435,7 +438,10 @@ class ProfileExtractionService:
                 except Exception as e:
                     logger.error(f"Error recovering job {job_id} from DB: {e}")
             
-            raise HTTPException(status_code=404, detail="Job session not found")
+            raise HTTPException(
+                status_code=404, 
+                detail="Job session not found. This may be due to a server restart. Please start a new generation."
+            )
         
         job_data = profile_jobs[job_id].copy()
         
@@ -585,6 +591,72 @@ class ProfileExtractionService:
             "email": None, "website": None, "linkedin": None, "github": None,
             "social_links": {}
         }
+
+    def cleanup_completed_jobs(self, max_age_minutes: int = 30) -> None:
+        """Clean up completed jobs older than specified age to prevent memory leaks.
+        
+        Args:
+            max_age_minutes: Maximum age in minutes for completed jobs to keep in memory
+        """
+        try:
+            current_time = datetime.now()
+            jobs_to_remove = []
+            
+            for job_id, job_data in profile_jobs.items():
+                # Only clean up completed or failed jobs
+                if job_data.get("status") in [ProfileStatus.COMPLETED, ProfileStatus.FAILED]:
+                    # Check completion/failure timestamps first, fall back to created_at
+                    job_end_time = (
+                        job_data.get("completed_at") or 
+                        job_data.get("failed_at") or 
+                        job_data.get("created_at")
+                    )
+                    
+                    if job_end_time:
+                        # Parse timestamp if it's a string
+                        if isinstance(job_end_time, str):
+                            try:
+                                job_end_time = datetime.fromisoformat(job_end_time.replace('Z', '+00:00'))
+                            except:
+                                # If parsing fails, remove the job as it's likely old
+                                jobs_to_remove.append(job_id)
+                                continue
+                        
+                        # Check if job is older than max_age
+                        age_minutes = (current_time - job_end_time).total_seconds() / 60
+                        if age_minutes > max_age_minutes:
+                            jobs_to_remove.append(job_id)
+            
+            # Remove old jobs
+            for job_id in jobs_to_remove:
+                profile_jobs.pop(job_id, None)
+                logger.info(f"Cleaned up old job: {job_id}")
+                
+        except Exception as e:
+            logger.error(f"Error during job cleanup: {e}")
+
+    def get_job_statistics(self) -> Dict[str, Any]:
+        """Get statistics about current jobs in memory.
+        
+        Returns:
+            Dictionary containing job statistics
+        """
+        try:
+            total_jobs = len(profile_jobs)
+            status_counts = {}
+            
+            for job_data in profile_jobs.values():
+                status = job_data.get("status", "unknown")
+                status_counts[status] = status_counts.get(status, 0) + 1
+            
+            return {
+                "total_jobs": total_jobs,
+                "status_breakdown": status_counts,
+                "job_ids": list(profile_jobs.keys())
+            }
+        except Exception as e:
+            logger.error(f"Error getting job statistics: {e}")
+            return {"error": str(e)}
 
 
 # Global service instance

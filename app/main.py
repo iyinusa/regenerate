@@ -5,15 +5,55 @@ This is the main entry point for the reGen application that helps regenerate
 and tell professional stories better using AI.
 """
 
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import os
+import logging
 
 # Import routers
 from app.api.routes import api_router
+from app.services.profile_service import profile_service
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Global variable to control cleanup task
+cleanup_task = None
+
+async def cleanup_jobs_periodically():
+    """Background task to clean up old completed jobs periodically."""
+    while True:
+        try:
+            # Clean up jobs older than 30 minutes
+            profile_service.cleanup_completed_jobs(max_age_minutes=30)
+            # Run every 10 minutes
+            await asyncio.sleep(600)
+        except Exception as e:
+            logger.error(f"Error in background cleanup task: {e}")
+            await asyncio.sleep(600)  # Still wait before retrying
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global cleanup_task
+    cleanup_task = asyncio.create_task(cleanup_jobs_periodically())
+    logger.info("Started background job cleanup task")
+    
+    yield
+    
+    # Shutdown
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Stopped background job cleanup task")
 
 # Create FastAPI application
 app = FastAPI(
@@ -22,6 +62,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -41,6 +82,19 @@ app.include_router(api_router)
 # Mount static files for frontend
 frontend_path = Path(__file__).parent.parent / "frontend"
 frontend_dist = frontend_path / "dist"
+
+# Mount immersive audio files - check production first, then development
+immersive_path_prod = frontend_dist / "immersive"
+immersive_path_dev = frontend_path / "public" / "immersive"
+
+if immersive_path_prod.exists():
+    app.mount("/immersive", StaticFiles(directory=str(immersive_path_prod)), name="immersive")
+    logger.info(f"Mounted production immersive audio files from {immersive_path_prod}")
+elif immersive_path_dev.exists():
+    app.mount("/immersive", StaticFiles(directory=str(immersive_path_dev)), name="immersive")
+    logger.info(f"Mounted development immersive audio files from {immersive_path_dev}")
+else:
+    logger.warning("No immersive audio files found")
 
 # Try to mount the built React app first (production)
 if frontend_dist.exists() and (frontend_dist / "index.html").exists():

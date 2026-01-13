@@ -28,6 +28,16 @@ async def websocket_task_updates(websocket: WebSocket, job_id: str):
         websocket: The WebSocket connection
         job_id: The job ID to subscribe to updates for
     """
+    from app.services.profile_service import profile_jobs
+    
+    # Check if job exists before accepting connection
+    if job_id not in profile_jobs:
+        # Try to check in task orchestrator as well
+        plan = task_orchestrator.get_plan(job_id)
+        if not plan:
+            await websocket.close(code=4004, reason="Job not found")
+            return
+    
     connection = None
     try:
         connection = await ws_manager.connect(websocket, job_id)
@@ -92,3 +102,29 @@ async def websocket_stats():
         "total_connections": ws_manager.get_connection_count(),
         "active_jobs": ws_manager.get_active_jobs()
     }
+
+
+@api_router.post("/admin/cleanup-jobs", tags=["admin"])
+async def cleanup_jobs():
+    """Manually trigger cleanup of old completed jobs."""
+    from app.services.profile_service import profile_service
+    
+    try:
+        profile_service.cleanup_completed_jobs(max_age_minutes=5)  # Clean jobs older than 5 minutes
+        return {"message": "Job cleanup completed successfully"}
+    except Exception as e:
+        logger.error(f"Manual job cleanup failed: {e}")
+        return {"error": f"Cleanup failed: {str(e)}"}
+
+
+@api_router.get("/admin/job-stats", tags=["admin"])
+async def get_job_stats():
+    """Get current job statistics."""
+    from app.services.profile_service import profile_service
+    
+    try:
+        stats = profile_service.get_job_statistics()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get job stats: {e}")
+        return {"error": f"Failed to get job stats: {str(e)}"}

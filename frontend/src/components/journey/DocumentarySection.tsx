@@ -19,7 +19,7 @@ const DocumentarySection: React.FC<DocumentarySectionProps> = ({ documentary, pr
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="section-title gradient-text">Your Story, Cinematic</h2>
+          <h2 className="section-title gradient-text">Your Story</h2>
           <p className="section-subtitle">A narrative journey through your professional evolution</p>
         </motion.div>
 
@@ -150,7 +150,7 @@ const DocumentarySection: React.FC<DocumentarySectionProps> = ({ documentary, pr
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
               <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
-            Powered by Gemini Veo 3.1 for AI-generated video content
+            AI-generated documentary might not be perfect.
           </p>
         </motion.div>
 

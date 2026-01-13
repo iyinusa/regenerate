@@ -169,6 +169,13 @@ const Regen: React.FC = () => {
         console.log('WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
         
+        // Handle specific close codes
+        if (event.code === 4004) {
+          // Job not found
+          setError('Job session not found. This may be due to a server restart. Please try generating again.');
+          return;
+        }
+        
         // Only attempt reconnection if the close was not intentional
         if (event.code !== 1000 && jobId) {
           setStatusMessage('Connection lost, attempting to reconnect...');
@@ -337,11 +344,20 @@ const Regen: React.FC = () => {
         } else {
           setError('Processing timeout. Please try again.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Polling error:', err);
+        
+        // Handle specific HTTP errors
+        if (err.message && err.message.includes('404')) {
+          setError('Job session not found. This may be due to a server restart. Please try generating again.');
+          return;
+        }
+        
         attempts++;
         if (attempts < maxAttempts) {
           pollTimeoutRef.current = setTimeout(poll, 3000) as any;
+        } else {
+          setError('Connection lost. Please try again.');
         }
       }
     };

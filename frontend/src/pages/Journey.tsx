@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { apiClient } from '@/lib/api.ts';
 import JourneyBackground from '@/components/JourneyBackground';
+import ImmersiveAudio from '@/components/ImmersiveAudio';
 import HeroSection from '@/components/journey/HeroSection';
 import TimelineSection from '@/components/journey/TimelineSection';
 import ExperienceSection from '@/components/journey/ExperienceSection';
@@ -109,10 +110,19 @@ const Journey: React.FC = () => {
             pollTimeoutRef.current = setTimeout(fetchProfileData, 2000) as any;
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch profile:', err);
-        setError('Failed to load profile data');
+        
+        // Handle specific error cases
+        if (err.message && err.message.includes('404')) {
+          setError('Profile session not found. This may be due to a server restart.');
+        } else {
+          setError('Failed to load profile data');
+        }
+        
         setLoading(false);
+        // Don't continue polling on error
+        return;
       }
     };
 
@@ -172,6 +182,7 @@ const Journey: React.FC = () => {
   return (
     <main className="journey-page" ref={containerRef}>
       <JourneyBackground activeSection={activeSection} />
+      <ImmersiveAudio profile={profile} />
       
       <div className="journey-content">
         {/* Hero Section */}

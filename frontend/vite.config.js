@@ -19,6 +19,12 @@ export default defineConfig({
 				target: 'ws://localhost:8000',
 				ws: true,
 				changeOrigin: true
+			},
+			// Proxy immersive audio files to backend for proper range request handling
+			'/immersive': {
+				target: 'http://localhost:8000',
+				changeOrigin: true,
+				secure: false
 			}
 		}
 	},
