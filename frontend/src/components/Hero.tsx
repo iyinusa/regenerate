@@ -10,6 +10,16 @@ interface HeroProps {
   onGenerate: (data: { url: string; jobId?: string; status?: string }) => void;
 }
 
+// Helper to get guest ID
+function getGuestId(): string {
+  let id = localStorage.getItem('rg_guest_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('rg_guest_id', id);
+  }
+  return id;
+}
+
 const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
   const heroRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -20,12 +30,56 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const [oauthStatus, setOauthStatus] = useState<{
+    github: { connected: boolean; username?: string };
+    linkedin: { connected: boolean; expired?: boolean };
+  }>({
+    github: { connected: false },
+    linkedin: { connected: false }
+  });
 
   useEffect(() => {
     // Test API connection
     apiClient.healthCheck()
       .then(() => console.log('API connection established'))
       .catch((err) => console.warn('API connection failed:', err));
+
+    // Check OAuth status
+    const guestId = getGuestId();
+    apiClient.getOAuthStatus(guestId)
+      .then((status: { user_found: boolean; github: { connected: boolean; username?: string }; linkedin: { connected: boolean; expired?: boolean } }) => {
+        if (status.user_found) {
+          setOauthStatus({
+            github: status.github,
+            linkedin: status.linkedin
+          });
+        }
+      })
+      .catch((err: Error) => console.warn('OAuth status check failed:', err));
+
+    // Check URL params for OAuth callbacks
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('github_connected') === 'true') {
+      const username = urlParams.get('username');
+      setOauthStatus(prev => ({
+        ...prev,
+        github: { connected: true, username: username || undefined }
+      }));
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (urlParams.get('linkedin_connected') === 'true') {
+      setOauthStatus(prev => ({
+        ...prev,
+        linkedin: { connected: true }
+      }));
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (urlParams.get('error')) {
+      setError(`OAuth Error: ${urlParams.get('error')}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     // GSAP animations on mount
     const tl = gsap.timeline();
@@ -103,11 +157,23 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
 
   async function handleGitHubOAuth() {
     try {
-      const authUrl = await apiClient.githubOAuth();
+      const guestId = getGuestId();
+      const authUrl = await apiClient.githubOAuth(guestId);
       window.location.href = authUrl.redirect_url;
     } catch (err) {
       console.error('GitHub OAuth failed:', err);
       setError('GitHub OAuth is unavailable.');
+    }
+  }
+
+  async function handleLinkedInOAuth() {
+    try {
+      const guestId = getGuestId();
+      const authUrl = await apiClient.linkedinOAuth(guestId);
+      window.location.href = authUrl.redirect_url;
+    } catch (err) {
+      console.error('LinkedIn OAuth failed:', err);
+      setError('LinkedIn OAuth is unavailable.');
     }
   }
 
@@ -140,7 +206,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
           </h1>
           
           <p ref={subtitleRef} className="hero-subtitle">
-            Traditional resumes are fading. We are using the <span className="highlight">Smartest AI</span> to distill your entire professional footprint into an immersive cinematic experience. Your work deserves more than bullet points.
+            Traditional resumes are fading. We are using the <span className="highlight">Smartest AI</span> to distill your entire professional footprint into an immersive cinematic experience. Your work deserves to be celebrated.
           </p>
 
           <div ref={ctaRef} className="cta-section">
@@ -154,7 +220,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyPress={handleKeyPress}
                 type="url"
-                placeholder="Paste LinkedIn, GitHub or Portfolio URL"
+                placeholder="Paste LinkedIn, Portfolio, or GitHub URL"
                 className="cli-input"
                 disabled={isLoading}
                 spellCheck="false"
@@ -180,14 +246,48 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
             )}
 
             <div className="secondary-actions">
-              <span className="divider-text">CONNECT SOURCE</span>
-              <button className="github-btn" onClick={handleGitHubOAuth}>
-                <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                </svg>
-                <span>Authorize GitHub Access</span>
-              </button>
-              <span className="divider-text">for indepth analysis</span>
+              <span className="divider-text">CONNECT</span>
+              <div className="oauth-buttons">
+                <button
+                  className={`oauth-btn linkedin-btn ${oauthStatus.linkedin.connected ? 'connected' : ''}`}
+                  onClick={handleLinkedInOAuth}
+                  disabled={oauthStatus.linkedin.connected && !oauthStatus.linkedin.expired}
+                >
+                  <svg height="20" width="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                  </svg>
+                  <span>
+                    {oauthStatus.linkedin.connected
+                      ? (oauthStatus.linkedin.expired ? 'Reconnect LinkedIn' : 'LinkedIn Connected')
+                      : 'LinkedIn Access'}
+                  </span>
+                  {oauthStatus.linkedin.connected && !oauthStatus.linkedin.expired && (
+                    <svg className="check-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  )}
+                </button>
+                <button 
+                  className={`oauth-btn github-btn ${oauthStatus.github.connected ? 'connected' : ''}`}
+                  onClick={handleGitHubOAuth}
+                  disabled={oauthStatus.github.connected}
+                >
+                  <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                  </svg>
+                  <span>
+                    {oauthStatus.github.connected 
+                      ? `Connected: ${oauthStatus.github.username || 'GitHub'}` 
+                      : 'GitHub Access'}
+                  </span>
+                  {oauthStatus.github.connected && (
+                    <svg className="check-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <span className="divider-text">for in-depth analysis</span>
             </div>
           </div>
 

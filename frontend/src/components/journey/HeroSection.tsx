@@ -19,7 +19,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ profile, documentary, section
         >
           {/* Name and Title */}
           <motion.h1 
-            className="hero-name gradient-text glow-text"
+            className="hero-name gradient-text"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}

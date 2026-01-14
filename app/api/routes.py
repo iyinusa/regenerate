@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.api.profile import router as profile_router
+from app.api.auth import router as auth_router
 from app.api.websocket import ws_manager, websocket_callback_factory
 from app.services.task_orchestrator import task_orchestrator
 
@@ -14,6 +15,7 @@ api_router = APIRouter(prefix="/api/v1")
 
 # Include all route modules
 api_router.include_router(profile_router)
+api_router.include_router(auth_router)
 
 
 # WebSocket endpoint for real-time task updates

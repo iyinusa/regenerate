@@ -79,6 +79,22 @@ class Settings(BaseSettings):
     google_search_api_key: str = Field(default="", description="Google Custom Search API key")
     google_search_cx_id: str = Field(default="", description="Google Custom Search Engine ID")
 
+    # GitHub OAuth settings
+    github_client_id: str = Field(default="", description="GitHub OAuth Client ID")
+    github_client_secret: str = Field(default="", description="GitHub OAuth Client Secret")
+    github_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/github/callback",
+        description="GitHub OAuth Redirect URI"
+    )
+    
+    # LinkedIn OAuth settings
+    linkedin_client_id: str = Field(default="", description="LinkedIn OAuth Client ID")
+    linkedin_client_secret: str = Field(default="", description="LinkedIn OAuth Client Secret")
+    linkedin_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/linkedin/callback",
+        description="LinkedIn OAuth Redirect URI"
+    )
+
     # Email settings
     email_host: str = Field(default="", description="SMTP host")
     email_port: int = Field(default=587, description="SMTP port")

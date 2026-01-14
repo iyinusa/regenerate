@@ -296,7 +296,7 @@ class ProfileExtractionService:
         profile["source_url"] = source_url
         profile["extraction_timestamp"] = datetime.utcnow().isoformat()
         profile["raw_data"] = {
-            "extraction_method": "gemini-3-pro-preview",
+            "extraction_method": "gemini-3-flash-preview",
             "orchestrated": True,
             "tasks_completed": len([k for k in result_data.keys() if result_data.get(k)]),
         }
@@ -492,7 +492,7 @@ class ProfileExtractionService:
                 source_url=url,
                 extraction_timestamp=datetime.utcnow(),
                 raw_data={
-                    "extraction_method": "gemini-3-pro-preview",
+                    "extraction_method": "gemini-3-flash-preview",
                     "orchestrated": False,
                 }
             )
@@ -530,13 +530,13 @@ class ProfileExtractionService:
             
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
-                model="gemini-3-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     tools=[{"url_context": {}}, {"google_search": {}}],
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
             

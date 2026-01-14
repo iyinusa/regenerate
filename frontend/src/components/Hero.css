@@ -171,7 +171,8 @@
 	display: flex;
 	align-items: center;
 	margin-top: 3rem;
-	gap: 2rem;
+	gap: 1.5rem;
+	flex-wrap: wrap;
 }
 
 .divider-text {
@@ -182,7 +183,13 @@
 	font-weight: 700;
 }
 
-.github-btn {
+.oauth-buttons {
+	display: flex;
+	gap: 1rem;
+	flex-wrap: wrap;
+}
+
+.oauth-btn {
 	display: flex;
 	align-items: center;
 	gap: 0.75rem;
@@ -195,11 +202,42 @@
 	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.3s;
+	font-size: 0.9rem;
 }
 
-.github-btn:hover {
+.oauth-btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.1);
+	border-color: rgba(255, 255, 255, 0.2);
+	transform: translateY(-2px);
+}
+
+.oauth-btn:disabled {
+	cursor: default;
+}
+
+.oauth-btn.connected {
+	background: rgba(39, 201, 63, 0.1);
+	border-color: rgba(39, 201, 63, 0.3);
+	color: #27c93f;
+}
+
+.oauth-btn.connected:hover {
+	background: rgba(39, 201, 63, 0.15);
+}
+
+.github-btn:hover:not(:disabled):not(.connected) {
 	background: #fff;
 	color: #000;
+}
+
+.linkedin-btn:hover:not(:disabled):not(.connected) {
+	background: #0077b5;
+	border-color: #0077b5;
+	color: #fff;
+}
+
+.check-icon {
+	margin-left: 0.25rem;
 }
 
 .features-grid {
@@ -265,4 +303,6 @@
 	.cli-input { width: 100%; text-align: center; }
 	.refactor-run-button { width: 100%; }
 	.secondary-actions { flex-direction: column; gap: 1rem; align-items: stretch; text-align: center; }
+	.oauth-buttons { flex-direction: column; width: 100%; }
+	.oauth-btn { justify-content: center; width: 100%; }
 }

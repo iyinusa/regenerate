@@ -399,31 +399,326 @@ class TaskOrchestrator:
     
     # Task Handlers
     async def _handle_fetch_profile(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
-        """Handle profile fetching task."""
-        task.message = "Analyzing profile with Gemini 3..."
-        task.progress = 20
+        """Handle profile fetching task with LinkedIn-aware extraction.
+        
+        This method detects the source type and uses the appropriate extraction method:
+        - LinkedIn (unauthenticated): Scrape HTML and pass to Gemini
+        - LinkedIn (authenticated): Use OAuth API and pass to Gemini  
+        - Other URLs: Use url_context tool directly
+        """
+        from app.services.linkedin_service import linkedin_service
+        
+        task.message = "Analysing profile source..."
+        task.progress = 10
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         if not self.genai_client:
             raise Exception("Gemini client not initialized")
         
-        prompt = get_profile_extraction_prompt(plan.source_url)
+        source_url = plan.source_url
+        guest_user_id = plan.options.get('guest_user_id')
         
-        task.progress = 40
-        task.message = "Extracting structured data..."
+        # Detect if this is a LinkedIn URL
+        is_linkedin = linkedin_service.is_linkedin_url(source_url)
+        
+        if is_linkedin:
+            return await self._handle_linkedin_profile(job_id, plan, task, source_url, guest_user_id)
+        else:
+            return await self._handle_standard_profile(job_id, plan, task, source_url)
+    
+    async def _handle_linkedin_profile(
+        self, 
+        job_id: str, 
+        plan: TaskPlan, 
+        task: Task, 
+        source_url: str,
+        guest_user_id: str
+    ) -> Dict[str, Any]:
+        """Handle LinkedIn profile extraction.
+        
+        Uses different strategies based on authentication status:
+        1. Authenticated: Use LinkedIn OAuth API
+        2. Unauthenticated: Scrape public HTML and pass to Gemini
+        """
+        from app.services.linkedin_service import linkedin_service
+        from app.db.session import get_db
+        from app.models.user import User
+        from sqlalchemy import select
+        
+        task.message = "Detected LinkedIn profile, checking authentication..."
+        task.progress = 20
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        linkedin_access_token = None
+        
+        # Check if user has LinkedIn OAuth credentials
+        if guest_user_id:
+            async for db in get_db():
+                try:
+                    result = await db.execute(
+                        select(User).where(User.guest_id == guest_user_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    
+                    if user and user.linkedin_access_token:
+                        # Check if token is not expired
+                        from datetime import datetime
+                        if not user.linkedin_token_expires_at or user.linkedin_token_expires_at > datetime.utcnow():
+                            linkedin_access_token = user.linkedin_access_token
+                            logger.info(f"Using authenticated LinkedIn access for user {user.id}")
+                except Exception as e:
+                    logger.error(f"Error checking LinkedIn auth: {e}")
+                finally:
+                    break
+        
+        if linkedin_access_token:
+            # Use authenticated LinkedIn API
+            return await self._handle_linkedin_authenticated(
+                job_id, task, source_url, linkedin_access_token
+            )
+        else:
+            # Use unauthenticated scraping
+            return await self._handle_linkedin_unauthenticated(
+                job_id, task, source_url
+            )
+    
+    async def _handle_linkedin_authenticated(
+        self,
+        job_id: str,
+        task: Task,
+        source_url: str,
+        access_token: str
+    ) -> Dict[str, Any]:
+        """Handle LinkedIn profile with OAuth authentication."""
+        from app.services.linkedin_service import linkedin_service
+        
+        task.message = "Fetching LinkedIn profile..."
+        task.progress = 40
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Fetch profile data using OAuth
+        linkedin_data = await linkedin_service.fetch_authenticated_profile(
+            access_token=access_token,
+            include_positions=True,
+            include_education=True,
+            include_skills=True
+        )
+        
+        if not linkedin_data.get("success"):
+            # Fall back to unauthenticated if OAuth fails
+            logger.warning(f"LinkedIn OAuth failed: {linkedin_data.get('error')}, falling back to scraping")
+            return await self._handle_linkedin_unauthenticated(job_id, task, source_url)
+        
+        task.progress = 60
+        task.message = "Processing LinkedIn data..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Use Gemini to process the LinkedIn API response
+        prompt = f"""Extract professional profile details from this LinkedIn API response.
+Also, use Google Search to find their personal portfolio, GitHub, or other professional presence.
+
+LinkedIn API Data:
+{json.dumps(linkedin_data.get('data', {}), indent=2)}
+
+Source URL: {source_url}
+
+Extract and structure all professional information including:
+- Basic profile information (name, title, location)
+- Work experience with dates and descriptions
+- Education history
+- Skills and endorsements
+- Any additional context found via Google Search"""
+
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],  # url_context removed - we have the data
+                    response_mime_type="application/json",
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Gemini extraction failed: {e}, trying without thinking config")
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],
+                    response_mime_type="application/json",
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                )
+            )
+        
+        task.progress = 80
+        task.message = "Processing response..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        result = self._parse_json_response(response.text)
+        result['source_url'] = source_url
+        result['extraction_timestamp'] = datetime.utcnow().isoformat()
+        result['extraction_method'] = 'linkedin_oauth'
+        
+        return result
+    
+    async def _handle_linkedin_unauthenticated(
+        self,
+        job_id: str,
+        task: Task,
+        source_url: str
+    ) -> Dict[str, Any]:
+        """Handle LinkedIn profile without OAuth (scraping approach)."""
+        from app.services.linkedin_service import linkedin_service
+        
+        task.message = "Reading public LinkedIn profile..."
+        task.progress = 30
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Attempt to scrape the public profile
+        scrape_result = await linkedin_service.scrape_public_profile(source_url)
+        
+        task.progress = 50
+        task.message = "Processing LinkedIn data..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        if scrape_result.get("success") and scrape_result.get("raw_html"):
+            # Successfully scraped - pass raw HTML to Gemini
+            raw_html = scrape_result["raw_html"]
+            
+            prompt = f"""Extract professional profile data from this LinkedIn profile HTML.
+Also, use Google Search to find additional news, portfolio links, or professional presence related to this person.
+
+LinkedIn Profile HTML (may be partial):
+{raw_html[:50000]}  # Limit HTML size for token constraints
+
+Source URL: {source_url}
+
+Extract and structure all available professional information including:
+- Name, headline, location
+- Work experience with companies, dates, descriptions
+- Education history
+- Skills
+- Any additional professional context from Google Search"""
+
+            try:
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],  # Search for additional context
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                        thinking_config=types.ThinkingConfig(thinking_level="low")
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Gemini extraction with thinking failed: {e}")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    )
+                )
+        else:
+            # Scraping failed - use Google Search as primary source
+            error_msg = scrape_result.get("message", "LinkedIn scraping blocked")
+            logger.warning(f"LinkedIn scraping failed: {error_msg}")
+            
+            task.message = "LinkedIn blocked, using AI-powered Search..."
+            await self._broadcast_update(job_id, "task_progress", task.to_dict())
+            
+            # Extract username for search
+            username = linkedin_service.extract_linkedin_username(source_url)
+            
+            prompt = f"""I need to extract professional profile data for a LinkedIn user.
+Direct access to the profile is blocked. Please use Google Search to find information about this person.
+
+LinkedIn Profile URL: {source_url}
+LinkedIn Username: {username or 'unknown'}
+
+Search for:
+1. Their name and current job title
+2. Company affiliations
+3. Professional background and experience
+4. Portfolio, GitHub, personal website
+5. News articles or publications
+6. Speaking engagements or contributions
+
+Compile all found information into a structured profile."""
+
+            try:
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                        thinking_config=types.ThinkingConfig(thinking_level="low")
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Gemini search failed: {e}")
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],
+                        response_mime_type="application/json",
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    )
+                )
+        
+        task.progress = 80
+        task.message = "Processing response..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        result = self._parse_json_response(response.text)
+        result['source_url'] = source_url
+        result['extraction_timestamp'] = datetime.utcnow().isoformat()
+        result['extraction_method'] = 'linkedin_scrape_or_search'
+        result['linkedin_auth_recommended'] = True  # Flag to suggest OAuth
+        
+        return result
+    
+    async def _handle_standard_profile(
+        self,
+        job_id: str,
+        plan: TaskPlan,
+        task: Task,
+        source_url: str
+    ) -> Dict[str, Any]:
+        """Handle non-LinkedIn profile extraction using url_context."""
+        task.message = "Extracting profile data..."
+        task.progress = 40
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        prompt = get_profile_extraction_prompt(source_url)
         
         # Try with thinking config first, fall back without if not supported
         try:
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
-                model="gemini-3-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     tools=[{"url_context": {}}, {"google_search": {}}],
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    thinking_config=types.ThinkingConfig(thinking_level="low"),
+                    # Ensure it can read fine print in portfolio images/resumes
+                    media_resolution="high"
                 )
             )
         except Exception as e:
@@ -431,24 +726,28 @@ class TaskOrchestrator:
                 logger.warning(f"Thinking config not supported for profile extraction: {str(e)}, retrying without thinking config")
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model="gemini-3-pro-preview",
+                    model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                        # Ensure it can read fine print in portfolio images/resumes
+                        media_resolution="high"
                     )
                 )
             elif "model" in str(e).lower() and "not found" in str(e).lower():
-                logger.warning(f"Model not found, falling back to gemini-1.5-pro-latest: {str(e)}")
+                logger.warning(f"Model not found, falling back to gemini-2.5-flash: {str(e)}")
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model="gemini-1.5-pro-latest",
+                    model="gemini-2.5-flash",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                        # Ensure it can read fine print in portfolio images/resumes
+                        media_resolution="high"
                     )
                 )
             else:
@@ -465,9 +764,15 @@ class TaskOrchestrator:
         return result
     
     async def _handle_enrich_profile(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
-        """Handle profile enrichment task."""
+        """Handle profile enrichment task with GitHub integration.
+        
+        Discovers and aggregates data from related sources including:
+        - GitHub repositories and contributions (if authenticated)
+        - Additional URLs found in profile
+        - Google Search for additional context
+        """
         task.message = "Discovering additional sources..."
-        task.progress = 30
+        task.progress = 20
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Get profile data from previous task
@@ -475,22 +780,169 @@ class TaskOrchestrator:
         if not profile_data or not isinstance(profile_data, dict):
             profile_data = {}
         
+        guest_user_id = plan.options.get('guest_user_id')
+        enriched_data = {**profile_data}
+        sources_enriched = []
+        
+        # Check for GitHub OAuth and enrich with repository data
+        if guest_user_id:
+            github_enrichment = await self._enrich_with_github(guest_user_id, task, job_id)
+            if github_enrichment:
+                enriched_data['github_data'] = github_enrichment
+                sources_enriched.append('github_oauth')
+        
+        task.progress = 50
+        task.message = "Checking additional profile URLs..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
         # Check for additional URLs to enrich from
         additional_urls = []
         if profile_data.get('website'):
             additional_urls.append(profile_data['website'])
-        if profile_data.get('github'):
+        if profile_data.get('github') and 'github_oauth' not in sources_enriched:
             additional_urls.append(profile_data['github'])
         
-        task.progress = 60
+        task.progress = 70
         task.message = f"Found {len(additional_urls)} additional sources"
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        # For now, return the profile data with enrichment metadata
-        # Enhance implementation, would aggregate from additional URLs
-        enriched = {**profile_data, "enriched": True, "sources_checked": len(additional_urls)}
+        # Mark enrichment metadata
+        enriched_data['enriched'] = True
+        enriched_data['sources_checked'] = len(additional_urls)
+        enriched_data['sources_enriched'] = sources_enriched
         
-        return enriched
+        return enriched_data
+    
+    async def _enrich_with_github(
+        self, 
+        guest_user_id: str, 
+        task: Task, 
+        job_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Enrich profile with GitHub data if OAuth is available.
+        
+        Args:
+            guest_user_id: Guest user identifier
+            task: Current task for progress updates
+            job_id: Job ID for broadcasting
+            
+        Returns:
+            GitHub enrichment data or None
+        """
+        from app.db.session import get_db
+        from app.models.user import User
+        from sqlalchemy import select
+        import httpx
+        
+        async for db in get_db():
+            try:
+                result = await db.execute(
+                    select(User).where(User.guest_id == guest_user_id)
+                )
+                user = result.scalar_one_or_none()
+                
+                if not user or not user.github_access_token:
+                    return None
+                
+                task.message = "Enriching with GitHub data..."
+                await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                
+                github_data = {
+                    'username': user.github_username,
+                    'authenticated': True,
+                    'repositories': [],
+                    'contributions': {},
+                    'languages': {},
+                    'significant_projects': []
+                }
+                
+                headers = {
+                    "Authorization": f"Bearer {user.github_access_token}",
+                    "Accept": "application/vnd.github+json"
+                }
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    # Fetch user's repositories
+                    repos_response = await client.get(
+                        f"https://api.github.com/users/{user.github_username}/repos",
+                        headers=headers,
+                        params={"sort": "updated", "per_page": 30}
+                    )
+                    
+                    if repos_response.status_code == 200:
+                        repos = repos_response.json()
+                        
+                        # Process repositories for significant projects
+                        significant_repos = []
+                        language_stats = {}
+                        
+                        for repo in repos:
+                            # Track languages
+                            if repo.get('language'):
+                                lang = repo['language']
+                                language_stats[lang] = language_stats.get(lang, 0) + 1
+                            
+                            # Identify significant projects (stars, forks, or has description)
+                            stars = repo.get('stargazers_count', 0)
+                            forks = repo.get('forks_count', 0)
+                            
+                            if stars >= 1 or forks >= 1 or repo.get('description'):
+                                significant_repos.append({
+                                    'name': repo['name'],
+                                    'description': repo.get('description', ''),
+                                    'url': repo['html_url'],
+                                    'stars': stars,
+                                    'forks': forks,
+                                    'language': repo.get('language'),
+                                    'updated_at': repo.get('updated_at'),
+                                    'topics': repo.get('topics', [])
+                                })
+                        
+                        # Sort by significance (stars + forks)
+                        significant_repos.sort(
+                            key=lambda x: x['stars'] + x['forks'], 
+                            reverse=True
+                        )
+                        
+                        github_data['repositories'] = repos[:10]  # Top 10 recent
+                        github_data['significant_projects'] = significant_repos[:10]
+                        github_data['languages'] = language_stats
+                        github_data['total_repos'] = len(repos)
+                    
+                    # Fetch contribution stats
+                    events_response = await client.get(
+                        f"https://api.github.com/users/{user.github_username}/events",
+                        headers=headers,
+                        params={"per_page": 100}
+                    )
+                    
+                    if events_response.status_code == 200:
+                        events = events_response.json()
+                        
+                        # Count event types
+                        event_counts = {}
+                        for event in events:
+                            event_type = event.get('type', 'Unknown')
+                            event_counts[event_type] = event_counts.get(event_type, 0) + 1
+                        
+                        github_data['contributions'] = {
+                            'recent_events': len(events),
+                            'event_types': event_counts,
+                            'push_events': event_counts.get('PushEvent', 0),
+                            'pr_events': event_counts.get('PullRequestEvent', 0),
+                            'issue_events': event_counts.get('IssuesEvent', 0),
+                        }
+                
+                logger.info(f"GitHub enrichment completed for user {user.id}")
+                return github_data
+                
+            except Exception as e:
+                logger.error(f"GitHub enrichment failed: {e}")
+                return None
+            finally:
+                break
+        
+        return None
     
     async def _handle_aggregate_history(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle history aggregation task.
@@ -519,13 +971,13 @@ class TaskOrchestrator:
         user_id = plan.options.get('user_id')
         
         if not guest_user_id:
-            task.message = "No guest identifier found, skipping history check"
+            task.message = "No identifier found, skipping history check"
             task.progress = 100
             await self._broadcast_update(job_id, "task_progress", task.to_dict())
             return {**profile_data, "history_checked": True, "aggregated": False}
         
         task.progress = 40
-        task.message = "Querying database for existing records..."
+        task.message = "Querying for existing records..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Query database for existing history
@@ -539,14 +991,14 @@ class TaskOrchestrator:
                 if not user:
                     # This shouldn't happen as user is created in profile_service
                     # But handle gracefully
-                    task.message = "User not found, skipping history check"
+                    task.message = "Record not found, skipping history check"
                     task.progress = 100
                     await self._broadcast_update(job_id, "task_progress", task.to_dict())
-                    return {**profile_data, "history_checked": True, "aggregated": False, "error": "User not found"}
+                    return {**profile_data, "history_checked": True, "aggregated": False, "error": "Record not found"}
                 
                 # Fetch all profile histories for this user EXCEPT the current one
                 task.progress = 60
-                task.message = f"Loading profile history for user..."
+                task.message = f"Loading profile history for record..."
                 await self._broadcast_update(job_id, "task_progress", task.to_dict())
                 
                 history_query = select(ProfileHistory).where(
@@ -560,7 +1012,7 @@ class TaskOrchestrator:
                 
                 if not histories or len(histories) == 0:
                     # No previous history found, this is the first record
-                    task.message = "First profile record for this user"
+                    task.message = "First profile record"
                     
                     # Update the current history record even for first record to ensure persistence
                     if current_history_id:
@@ -576,7 +1028,7 @@ class TaskOrchestrator:
                 
                 # Aggregate with Gemini 3
                 task.progress = 70
-                task.message = f"Aggregating {len(histories)} previous records with Gemini 3..."
+                task.message = f"Aggregating {len(histories)} previous records..."
                 await self._broadcast_update(job_id, "task_progress", task.to_dict())
                 
                 if not self.genai_client:
@@ -598,18 +1050,18 @@ class TaskOrchestrator:
                 )
                 
                 task.progress = 80
-                task.message = "Processing aggregation with Gemini 3 Flash..."
+                task.message = "Processing aggregation..."
                 await self._broadcast_update(job_id, "task_progress", task.to_dict())
                 
                 # Try with thinking config first, fall back without if failed
                 try:
                     response = await asyncio.to_thread(
                         self.genai_client.models.generate_content,
-                        model="gemini-3-pro-preview",
+                        model="gemini-3-flash-preview",
                         contents=aggregation_prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
-                            thinking_config=types.ThinkingConfig(thinking_level="high")
+                            thinking_config=types.ThinkingConfig(thinking_level="low")
                         )
                     )
                 except Exception as e:
@@ -708,12 +1160,12 @@ class TaskOrchestrator:
         try:
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
-                model="gemini-3-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -721,7 +1173,7 @@ class TaskOrchestrator:
                 logger.warning("Thinking config not supported, retrying without thinking config")
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model="gemini-3-pro-preview",
+                    model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -732,7 +1184,7 @@ class TaskOrchestrator:
                 raise
         
         task.progress = 80
-        task.message = "Finalizing journey structure..."
+        task.message = "Finalising journey structure..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         return self._parse_json_response(response.text)
@@ -757,12 +1209,12 @@ class TaskOrchestrator:
         try:
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
-                model="gemini-3-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=TIMELINE_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -770,7 +1222,7 @@ class TaskOrchestrator:
                 logger.warning("Thinking config not supported for timeline, retrying without thinking config")
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model="gemini-3-pro-preview",
+                    model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -796,19 +1248,19 @@ class TaskOrchestrator:
         prompt = get_documentary_narrative_prompt(journey_data, profile_data)
         
         task.progress = 50
-        task.message = "Writing video segments..."
+        task.message = "Writing documentary segments..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Try with thinking config first, fall back without if not supported
         try:
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
-                model="gemini-3-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=DOCUMENTARY_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -816,7 +1268,7 @@ class TaskOrchestrator:
                 logger.warning("Thinking config not supported for documentary, retrying without thinking config")
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
-                    model="gemini-3-pro-preview",
+                    model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -827,14 +1279,14 @@ class TaskOrchestrator:
                 raise
         
         task.progress = 80
-        task.message = "Finalizing documentary structure..."
+        task.message = "Finalising documentary structure..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         return self._parse_json_response(response.text)
     
     async def _handle_generate_video(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle video generation task using Veo 3.1."""
-        task.message = "Preparing video generation (Veo 3.1)..."
+        task.message = "Preparing video documentary..."
         task.progress = 30
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
@@ -845,8 +1297,8 @@ class TaskOrchestrator:
         return {
             "video_ready": False,
             "segments_prepared": len(documentary_data.get("segments", [])),
-            "estimated_duration": documentary_data.get("duration_estimate", "60-90 seconds"),
-            "status": "Video generation queued for Veo 3.1"
+            "estimated_duration": documentary_data.get("duration_estimate", "8-40 seconds"),
+            "status": "Video generation queued"
         }
     
     async def _handle_unknown(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
