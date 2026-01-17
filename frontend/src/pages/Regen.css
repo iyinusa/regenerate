@@ -1,18 +1,249 @@
+/* New Styles for Refactored Regen.tsx without Tailwind */
+
+/* Ensure the page is relative and takes full height */
+.processing-page {
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+    padding-bottom: 5rem;
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-primary, #ffffff);
+}
+
+/* Header Adjustments */
+.processing-header {
+    /* Inherits existing styles */
+}
+
+/* Active Task Center Display */
+.active-task-display {
+    width: 100%;
+    max-width: 700px;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 2rem auto;
+}
+
+.active-task-card {
+    text-align: center;
+    padding: 2.5rem;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+    width: 100%;
+}
+
+.active-task-icon-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.spinner-large {
+    position: relative;
+    width: 6rem;
+    height: 6rem;
+}
+
+.spinner-ring-ping {
+    position: absolute;
+    inset: 0;
+    border: 4px solid rgba(6, 182, 212, 0.3);
+    border-radius: 50%;
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+    opacity: 0.2;
+}
+
+.spinner-ring-spin {
+    position: absolute;
+    inset: 0;
+    border-top: 4px solid rgb(6, 182, 212);
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid transparent; /* Make it look like a partial ring */
+    border-left: 4px solid transparent;
+    border-radius: 50%;
+    animation: spin 1.5s linear infinite;
+}
+
+.spinner-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: rgb(6, 182, 212);
+}
+
+.icon-completed-large {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-completed-large svg {
+    width: 3rem;
+    height: 3rem;
+    color: rgb(74, 222, 128); /* Green-400 */
+}
+
+.active-task-title {
+    font-size: 2rem;
+    font-weight: 300;
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.active-task-description {
+    font-size: 1.1rem;
+    color: rgba(165, 243, 252, 0.8); /* Cyan-200/80 */
+    margin-bottom: 1.5rem;
+    max-width: 28rem;
+    margin-left: auto;
+    margin-right: auto;
+    min-height: 3rem; /* Prevent layout shift */
+}
+
+.active-task-step {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.5;
+}
+
+/* Overall Progress Footer */
+.progress-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 2rem;
+    background: linear-gradient(to top, black, rgba(0,0,0,0.8), transparent);
+    z-index: 20;
+}
+
+.progress-footer-content {
+    max-width: 56rem; /* max-w-4xl */
+    margin: 0 auto;
+}
+
+.progress-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.progress-label-text {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgb(6, 182, 212); /* Cyan-500 */
+}
+
+.progress-label-value {
+    font-size: 2.25rem;
+    font-weight: 200;
+    color: white;
+}
+
+.progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.progress-fill-animated {
+    height: 100%;
+    background: rgb(6, 182, 212); /* Cyan-500 */
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.8);
+}
+
+.progress-footer-note {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Connection Status overrides */
+.connection-status-pill {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.status-dot-pill {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+}
+.status-dot-pill.connected {
+    background-color: rgb(34, 197, 94);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+.status-dot-pill.disconnected {
+    background-color: rgb(239, 68, 68);
+}
+
+.status-text-pill {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.disclaimer {
+	font-size: 0.55rem;
+	color: rgba(255, 255, 255, 0.5);
+	margin-top: 0.2rem;
+}
+
+/* Initializing state */
+.initializing-text {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1.25rem;
+}
+
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 /* ===========================================
    reGen Processing Page - Enhanced Styles
    =========================================== */
 
-.processing-page {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	min-height: 100vh;
-	padding: 2rem;
-	background: var(--primary-bg);
-	color: var(--text-primary);
-	position: relative;
-	overflow: hidden;
-}
+/* Remove duplicate .processing-page - using the one at the top */
 
 /* Background subtle animation */
 .processing-page::before {
@@ -29,6 +260,7 @@
 	);
 	animation: backgroundPulse 8s ease-in-out infinite;
 	pointer-events: none;
+	z-index: 0;
 }
 
 @keyframes backgroundPulse {

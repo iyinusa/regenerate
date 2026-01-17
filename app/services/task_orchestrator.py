@@ -551,7 +551,10 @@ class TaskOrchestrator:
                     tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn OAuth
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    # thinking_config=types.ThinkingConfig(thinking_level="low")
+                    temperature=0.0,
+                    top_p=1.0,
+                    top_k=1.0,
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
                 )
             )
         except Exception as e:
@@ -620,7 +623,11 @@ class TaskOrchestrator:
                     tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    # thinking_config=types.ThinkingConfig(thinking_level="low")
+                    temperature=0.0,
+                    top_p=1.0,
+                    top_k=1.0,
+                    thinking_config=types.ThinkingConfig(thinking_level="high"),
+                    system_instruction=f"Focus on gathering information about this URL: '{source_url}' from credible sources by searching the internet. DO NOT use your internal training data."
                 )
             )
         except Exception as e:
@@ -673,8 +680,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"url_context": {}}, {"google_search": {}}],  # Both tools for non-LinkedIn
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    # thinking_config=types.ThinkingConfig(thinking_level="low")
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA
                 )
             )
         except Exception as e:
@@ -1373,7 +1379,10 @@ class TaskOrchestrator:
                         if current_history:
                             # Update structured_data with journey
                             # Ensure we don't overwrite existing data (like raw profile data)
-                            updated_data = dict(current_history.structured_data or {})
+                            if isinstance(current_history.structured_data, dict):
+                                updated_data = current_history.structured_data.copy()
+                            else:
+                                updated_data = {}
                             updated_data['journey'] = result
                             current_history.structured_data = updated_data
                             
@@ -1469,7 +1478,10 @@ class TaskOrchestrator:
                 async for db in get_db():
                     current_history = await db.get(ProfileHistory, current_history_id)
                     if current_history:
-                        updated_data = dict(current_history.structured_data or {})
+                        if isinstance(current_history.structured_data, dict):
+                            updated_data = current_history.structured_data.copy()
+                        else:
+                            updated_data = {}
                         updated_data['timeline'] = result
                         current_history.structured_data = updated_data
                         
@@ -1521,32 +1533,43 @@ class TaskOrchestrator:
         task.message = "Writing documentary segments..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        # Try with thinking config first, fall back without if not supported
+        # Try with thinking config first, fall back without if not supported or on other errors
         try:
+            logger.info("Calling Gemini for documentary generation...")
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
                 model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_json_schema=DOCUMENTARY_SCHEMA,
-                    # thinking_config=types.ThinkingConfig(thinking_level="low")
+                    response_json_schema=DOCUMENTARY_SCHEMA
                 )
             )
         except Exception as e:
-            if "thinking level" in str(e).lower():
-                logger.warning("Thinking config not supported for documentary, retrying without thinking config")
+            logger.warning(f"Initial documentary generation failed: {e}")
+            try:
+                logger.info("Retrying documentary generation without strict schema...")
+                # Fallback without schema to be more lenient
                 response = await asyncio.to_thread(
                     self.genai_client.models.generate_content,
                     model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_json_schema=DOCUMENTARY_SCHEMA
+                        response_mime_type="application/json"
                     )
                 )
-            else:
-                raise
+            except Exception as retry_error:
+                logger.error(f"Documentary generation failed after retry: {retry_error}")
+                # Return a minimal valid structure with error info instead of failing the task
+                return {
+                    "title": journey_data.get("summary", {}).get("headline", "Professional Journey"),
+                    "tagline": "A professional story",
+                    "duration_estimate": "32 seconds", 
+                    "segments": [],
+                    "opening_hook": "Welcome to my professional journey.",
+                    "closing_statement": "Thank you for watching.",
+                    "error": f"Generation failed: {str(retry_error)}"
+                }
         
         task.progress = 80
         task.message = "Finalising documentary structure..."
@@ -1564,7 +1587,10 @@ class TaskOrchestrator:
                 async for db in get_db():
                     current_history = await db.get(ProfileHistory, current_history_id)
                     if current_history:
-                        updated_data = dict(current_history.structured_data or {})
+                        if isinstance(current_history.structured_data, dict):
+                            updated_data = current_history.structured_data.copy()
+                        else:
+                            updated_data = {}
                         updated_data['documentary'] = result
                         current_history.structured_data = updated_data
                         

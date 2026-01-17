@@ -161,12 +161,13 @@ You MUST supplement this with Google Search to build a rich profile.
 The provided URL is just the starting point. You MUST use Google Search (and URL Context for non-LinkedIn URLs) to:
 1. Find and aggregate data from public sources (Personal Website, GitHub, Twitter/X, Portfolio, Blog)
 2. **CRITICAL:** Discover and extract ALL relevant links about this person including:
-   - Article mentions (news, interviews, features)
-   - Blog posts they wrote or are featured in
+   - Article mentions (news, interviews, features, awards, publications)
+   - Blog posts they are featured in
    - Speaking engagements or event appearances
    - Project showcases
    - Social media profiles
    - Portfolio pages
+   - Awards or recognitions
    - Any public mentions or references
 
 **URL TO ANALYZE:** {url}
@@ -185,6 +186,7 @@ Extract the standard profile fields:
 - projects: Notable projects (with dates)
 - achievements: Awards and recognitions (with dates/year)
 - certifications: Professional certifications
+- publications: Published works (if any, with dates/year)
 - email: Contact email (if publicly visible)
 - website: Personal website/Portfolio
 - linkedin: LinkedIn URL
@@ -196,7 +198,7 @@ You MUST also extract a comprehensive list of related links:
 - related_links: Array of objects with:
   - url: The full URL
   - title: Page/article title
-  - type: "article", "blog", "portfolio", "project", "social", "mention", "other"
+  - type: "article", "blog", "portfolio", "project", "research", "social", "mention", "other"
   - description: Brief description of the content
   - source: Publisher/platform name if identifiable
   
@@ -206,9 +208,10 @@ You MUST also extract a comprehensive list of related links:
 1. For LinkedIn URLs: Use ONLY Google Search (not url_context) to find mentions
 2. For other URLs: Use BOTH url_context AND google_search
 3. SMART SEARCH QUERIES (use person's name + company if known):
-   - "[Person Name] [Company] awards recognition"
-   - "[Person Name] [Company] interview podcast"
+   - "[Person Name] [Company] awards"
+   - "[Person Name] [Company] interview"
    - "[Person Name] [Company] published article blog"
+   - "[Person Name] [Company] research paper"
    - "[Person Name] [Company] speaking conference presentation"
    - "[Person Name] [Company] portfolio projects work"
    - "[Person Name] [Company] featured mentioned press"
@@ -219,20 +222,20 @@ You MUST also extract a comprehensive list of related links:
 
 **LINK INTELLIGENCE REQUIREMENTS:**
 - Return DIRECT links to specific pages that mention the person (not homepage/base URLs)
-- Example: Return "https://techblog.com/interview-with-john-doe-2024" NOT "https://techblog.com"
-- Prioritize content-rich pages: awards, interviews, publications, articles, project showcases, conference talks
+- Example: Return "https://techblog.com/interview-with-kennedy-yinusa-2024" NOT "https://techblog.com"
+- Prioritize content-rich pages: awards, interviews, publications, research, articles, project showcases, conference talks, events
 - Include publication dates in descriptions when visible
 - Focus on recent content (last 3-5 years) but include significant older achievements
 - Target 10-20 high-quality specific links rather than 5 general ones
 
 **CRITICAL DATA INTEGRITY RULES:**
 1. **IDENTITY ANCHOR:** The person is defined ONLY by the URL: {url}
-2. **STRICT VERIFICATION:** Verify identity using (Name and/or Company), can also consider Title (but not too strict)
-3. **NO HALLUCINATION:** If unsure a link belongs to THIS person, exclude it
+2. **STRICT VERIFICATION:** Verify identity using (Name and/or Company), can also consider Title
+3. **NO HALLUCINATION:** If unsure a link mention or belongs to THIS person, exclude it
 4. **TIMELINE FOCUS:** Capture dates for ALL awards, experiences, publication, achievements, projects, etc
 
 **VERIFICATION:**
-Before adding any field or link, ask: "Is this definitely the same person?"
+Before adding any field or link, ask: "Is this definitely the same person?" (VERY IMPORTANT)
 
 Return a JSON object. Use null for missing string fields and empty arrays [] for missing list fields.
 Include the "related_links" array with all discovered links for enrichment."""

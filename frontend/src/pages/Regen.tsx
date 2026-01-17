@@ -1,6 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '@/lib/api.ts';
+import GlobeBackground from '../components/GlobeBackground';
 import './Regen.css';
 
 // Task status types
@@ -45,9 +47,17 @@ const Regen: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [overallProgress, setOverallProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Initializing...');
+  const [, setStatusMessage] = useState('Initializing...');
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track active task for display
+  const activeTask = useMemo(() => {
+     return tasks.find(t => t.task_id === currentTaskId) || 
+            tasks.find(t => t.status === 'running') || 
+            tasks.find(t => t.status === 'pending') || 
+            tasks[tasks.length - 1]; // Fallback to last if all completed
+  }, [tasks, currentTaskId]);
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
@@ -59,7 +69,7 @@ const Regen: React.FC = () => {
       task_id: 'task_001',
       task_type: 'fetch_profile',
       name: 'Extracting Profile Data',
-      description: 'Using Gemini 3 to fetch and analyze profile data',
+      description: 'AI fetch and analyse profile data',
       order: 1,
       status: 'pending',
       progress: 0,
@@ -107,7 +117,7 @@ const Regen: React.FC = () => {
       task_id: 'task_005',
       task_type: 'generate_timeline',
       name: 'Generating Timeline',
-      description: 'Creating interactive timeline visualization',
+      description: 'Creating interactive timeline visualisation',
       order: 5,
       status: 'pending',
       progress: 0,
@@ -158,7 +168,6 @@ const Regen: React.FC = () => {
           }
           
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('WebSocket message received:', message);
           handleWebSocketMessage(message);
         } catch (e) {
           console.error('Failed to parse WebSocket message:', e, 'Raw data:', event.data);
@@ -393,44 +402,10 @@ const Regen: React.FC = () => {
     };
   }, [searchParams, connectWebSocket]);
 
-  // Get task status icon
-  const getTaskIcon = (task: Task) => {
-    switch (task.status) {
-      case 'completed':
-        return (
-          <svg className="task-icon completed" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <path d="M8 12l2.5 2.5L16 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      case 'running':
-        return <div className="task-icon running"><div className="spinner"></div></div>;
-      case 'failed':
-        return (
-          <svg className="task-icon failed" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        );
-      case 'skipped':
-        return (
-          <svg className="task-icon skipped" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        );
-      default:
-        return (
-          <div className="task-icon pending">
-            <span>{task.order}</span>
-          </div>
-        );
-    }
-  };
-
   if (error) {
     return (
       <main className="processing-page">
+        <GlobeBackground taskTrigger={0} />
         <div className="processing-container error-state">
           <div className="error-icon">
             <svg viewBox="0 0 24 24" fill="none" width="64" height="64">
@@ -450,99 +425,100 @@ const Regen: React.FC = () => {
 
   return (
     <main className="processing-page">
-      <div className="processing-container">
+      <GlobeBackground taskTrigger={activeTask ? activeTask.order : 0} />
+      
+      <div className="processing-container" style={{ position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <div className="processing-header">
-          <div className="header-glow"></div>
-          <h1 className="gradient-text">Regenerating Your Story</h1>
-          <p className="url-display">
-            Analyzing: <span className="url-highlight">{url}</span>
-          </p>
-          <div className="connection-status">
-            <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></span>
-            <span className="status-text">{isConnected ? 'Live updates' : 'Reconnecting...'}</span>
-          </div>
-        </div>
-
-        {/* Current Status */}
-        <div className="current-status">
-          <div className="status-pulse"></div>
-          <span className="status-message">{statusMessage}</span>
-        </div>
-
-        {/* Task List */}
-        <div className="tasks-container">
-          {tasks.map((task, index) => (
-            <div 
-              key={task.task_id}
-              className={`task-item ${task.status} ${task.task_id === currentTaskId ? 'current' : ''}`}
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div className="task-icon-wrapper">
-                {getTaskIcon(task)}
-              </div>
-              
-              <div className="task-content">
-                <div className="task-header">
-                  <span className="task-name">{task.name}</span>
-                  {task.status === 'running' && task.progress > 0 && (
-                    <span className="task-percentage">{task.progress}%</span>
-                  )}
-                </div>
-                
-                <div className="task-description">
-                  {task.status === 'running' && task.message ? task.message : task.description}
-                </div>
-                
-                {task.status === 'running' && (
-                  <div className="task-progress-bar">
-                    <div 
-                      className="task-progress-fill" 
-                      style={{ width: `${task.progress}%` }}
-                    ></div>
-                  </div>
-                )}
-                
-                {task.status === 'failed' && task.error && (
-                  <div className="task-error">{task.error}</div>
-                )}
-              </div>
-              
-              {task.status === 'completed' && (
-                <div className="task-checkmark">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              )}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h1 className="gradient-text">Regenerating Your Story</h1>
+            <p className="url-display">
+              Analysing: <span className="url-highlight">{url}</span>
+            </p>
+            <div className="connection-status-pill">
+              <span className={`status-dot-pill ${isConnected ? 'connected' : 'disconnected'}`}></span>
+              <span className="status-text-pill">{isConnected ? 'Live Connection' : 'Connecting...'}</span>
             </div>
-          ))}
+          </motion.div>
         </div>
 
-        {/* Overall Progress */}
-        <div className="overall-progress">
-          <div className="progress-header">
-            <span>Overall Progress</span>
-            <span className="progress-percentage">{overallProgress}%</span>
-          </div>
-          <div className="progress-bar-container">
-            <div 
-              className="progress-bar-fill" 
-              style={{ width: `${overallProgress}%` }}
-            >
-              <div className="progress-bar-glow"></div>
+        {/* Center Active Task Display */}
+        <div className="active-task-display glass card-glow">
+            <AnimatePresence mode="wait">
+                {activeTask ? (
+                    <motion.div
+                        key={activeTask.task_id}
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+                        transition={{ duration: 0.5 }}
+                        className="active-task-card"
+                    >
+                        <div className="active-task-icon-container">
+                             {/* Large Icon / Spinner */}
+                             {activeTask.status === 'running' || activeTask.status === 'pending' ? (
+                                <div className="spinner-large">
+                                    <div className="spinner-ring-ping"></div>
+                                    <div className="spinner-ring-spin"></div>
+                                    <div className="spinner-text">
+                                        <span>{activeTask.order}</span>
+                                    </div>
+                                </div>
+                             ) : (
+                                <div className="icon-completed-large">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                             )}
+                        </div>
+
+                        <h2 className="active-task-title">{activeTask.name}</h2>
+                        <p className="active-task-description">
+                            {activeTask.status === 'running' && activeTask.message ? activeTask.message : activeTask.description}
+                        </p>
+                        
+                        <div className="active-task-step">
+                            <span>Step {activeTask.order} of {tasks.length}</span>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }}
+                        className="initializing-text"
+                    >
+                        Initializing journey...
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+
+        {/* Overall Progress Footer */}
+        <div className="progress-footer">
+          <div className="progress-footer-content">
+            <div className="progress-labels">
+                <span className="progress-label-text">Total Completion</span>
+                <span className="progress-label-value">{Math.round(overallProgress)}%</span>
             </div>
+            <div className="progress-track">
+                <motion.div 
+                    className="progress-fill-animated"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${overallProgress}%` }}
+                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                />
+            </div>
+             <p className="progress-footer-note">
+              reGen is analysing your professional journey across multiple platforms.<br />
+              <span className="disclaimer">reGen can make mistakes, so double-check. You can amend or regenerate journey.</span>
+            </p>
           </div>
         </div>
 
-        {/* Footer Note */}
-        <p className="processing-note">
-          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          Gemini 3 is analyzing your professional journey across multiple platforms.
-        </p>
       </div>
     </main>
   );
