@@ -2,6 +2,8 @@
 
 This service coordinates the execution of planned tasks for profile-to-journey
 transformation, providing real-time updates via WebSocket connections.
+
+Uses Pydantic models for Gemini structured output (production-grade approach).
 """
 
 import asyncio
@@ -22,10 +24,18 @@ from app.prompts import (
     get_journey_structuring_prompt,
     get_timeline_generation_prompt,
     get_documentary_narrative_prompt,
-    PROFILE_EXTRACTION_SCHEMA,
-    JOURNEY_STRUCTURE_SCHEMA,
-    TIMELINE_SCHEMA,
-    DOCUMENTARY_SCHEMA,
+    # Pydantic Models for structured output
+    ProfileExtractionResult,
+    JourneyStructureResult,
+    TimelineResult,
+    DocumentaryResult,
+    ProfileAggregationResult,
+    # Schema generators
+    get_profile_extraction_schema,
+    get_journey_structure_schema,
+    get_timeline_schema,
+    get_documentary_schema,
+    get_profile_aggregation_schema,
 )
 
 logger = logging.getLogger(__name__)
@@ -550,7 +560,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn OAuth
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    response_json_schema=ProfileExtractionResult.model_json_schema(),
                     temperature=0.0,
                     top_p=1.0,
                     top_k=1.0,
@@ -566,7 +576,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    response_json_schema=ProfileExtractionResult.model_json_schema(),
                 )
             )
         
@@ -574,7 +584,12 @@ class TaskOrchestrator:
         task.message = "Processing response..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        result = self._parse_json_response(response.text)
+        # Parse and validate response using Pydantic
+        result = self._parse_and_validate_response(
+            response.text, 
+            ProfileExtractionResult,
+            fallback_to_dict=True
+        )
         
         # Ensure OAuth data is included
         if not result.get('email') and linkedin_data.get('data', {}).get('email'):
@@ -622,7 +637,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    response_json_schema=ProfileExtractionResult.model_json_schema(),
                     temperature=0.0,
                     top_p=1.0,
                     top_k=1.0,
@@ -639,7 +654,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    response_json_schema=ProfileExtractionResult.model_json_schema(),
                 )
             )
         
@@ -647,7 +662,12 @@ class TaskOrchestrator:
         task.message = "Processing response..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        result = self._parse_json_response(response.text)
+        # Parse and validate response using Pydantic
+        result = self._parse_and_validate_response(
+            response.text,
+            ProfileExtractionResult,
+            fallback_to_dict=True
+        )
         result['source_url'] = source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
         result['extraction_method'] = 'linkedin_search'
@@ -680,7 +700,7 @@ class TaskOrchestrator:
                 config=types.GenerateContentConfig(
                     tools=[{"url_context": {}}, {"google_search": {}}],  # Both tools for non-LinkedIn
                     response_mime_type="application/json",
-                    response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                    response_json_schema=ProfileExtractionResult.model_json_schema()
                 )
             )
         except Exception as e:
@@ -693,7 +713,7 @@ class TaskOrchestrator:
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                        response_json_schema=ProfileExtractionResult.model_json_schema()
                     )
                 )
             elif "model" in str(e).lower() and "not found" in str(e).lower():
@@ -705,7 +725,7 @@ class TaskOrchestrator:
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
+                        response_json_schema=ProfileExtractionResult.model_json_schema()
                     )
                 )
             else:
@@ -715,7 +735,12 @@ class TaskOrchestrator:
         task.message = "Processing response..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        result = self._parse_json_response(response.text)
+        # Parse and validate response using Pydantic
+        result = self._parse_and_validate_response(
+            response.text,
+            ProfileExtractionResult,
+            fallback_to_dict=True
+        )
         result['source_url'] = plan.source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
         result['extraction_method'] = 'standard_with_search'
@@ -1066,6 +1091,7 @@ class TaskOrchestrator:
                                 contents=enrichment_prompt,
                                 config=types.GenerateContentConfig(
                                     response_mime_type="application/json",
+                                    response_json_schema=ProfileAggregationResult.model_json_schema(),
                                     # thinking_config=types.ThinkingConfig(thinking_level="low")
                                 )
                             )
@@ -1077,13 +1103,19 @@ class TaskOrchestrator:
                                     model="gemini-3-flash-preview",
                                     contents=enrichment_prompt,
                                     config=types.GenerateContentConfig(
-                                        response_mime_type="application/json"
+                                        response_mime_type="application/json",
+                                        response_json_schema=ProfileAggregationResult.model_json_schema()
                                     )
                                 )
                             else:
                                 raise
                         
-                        enriched_profile = self._parse_json_response(response.text)
+                        # Parse and validate response using Pydantic
+                        enriched_profile = self._parse_and_validate_response(
+                            response.text,
+                            ProfileAggregationResult,
+                            fallback_to_dict=True
+                        )
                         
                         # Save enriched profile
                         if current_history_id:
@@ -1169,6 +1201,7 @@ class TaskOrchestrator:
                         contents=aggregation_prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
+                            response_json_schema=ProfileAggregationResult.model_json_schema(),
                             # thinking_config=types.ThinkingConfig(thinking_level="low")
                         )
                     )
@@ -1180,7 +1213,8 @@ class TaskOrchestrator:
                             model="gemini-3-flash-preview",
                             contents=aggregation_prompt,
                             config=types.GenerateContentConfig(
-                                response_mime_type="application/json"
+                                response_mime_type="application/json",
+                                response_json_schema=ProfileAggregationResult.model_json_schema()
                             )
                         )
                     elif "model" in str(e).lower() and "not found" in str(e).lower():
@@ -1190,13 +1224,19 @@ class TaskOrchestrator:
                             model="gemini-2.5-flash",
                             contents=aggregation_prompt,
                             config=types.GenerateContentConfig(
-                                response_mime_type="application/json"
+                                response_mime_type="application/json",
+                                response_json_schema=ProfileAggregationResult.model_json_schema()
                             )
                         )
                     else:
                         raise
                 
-                aggregated_data = self._parse_json_response(response.text)
+                # Parse and validate response using Pydantic
+                aggregated_data = self._parse_and_validate_response(
+                    response.text,
+                    ProfileAggregationResult,
+                    fallback_to_dict=True
+                )
                 
                 # Update the current history record with aggregated data
                 if current_history_id:
@@ -1257,7 +1297,7 @@ class TaskOrchestrator:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
+                    response_json_schema=JourneyStructureResult.model_json_schema(),
                     # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
@@ -1273,7 +1313,7 @@ class TaskOrchestrator:
                         contents=prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
-                            response_json_schema=JOURNEY_STRUCTURE_SCHEMA
+                            response_json_schema=JourneyStructureResult.model_json_schema()
                         )
                     )
                     logger.info(f"Gemini response received (retry), length: {len(response.text) if response and response.text else 0}")
@@ -1287,8 +1327,8 @@ class TaskOrchestrator:
                             model="gemini-2.5-flash",
                             contents=prompt,
                             config=types.GenerateContentConfig(
-                                response_mime_type="application/json"
-                                # Note: Removed schema to be more lenient
+                                response_mime_type="application/json",
+                                response_json_schema=JourneyStructureResult.model_json_schema()
                             )
                         )
                         logger.info(f"Fallback model response received, length: {len(response.text) if response and response.text else 0}")
@@ -1347,7 +1387,13 @@ class TaskOrchestrator:
                 }
 
             logger.info(f"Parsing journey response: {response.text[:200]}...")
-            result = self._parse_json_response(response.text)
+            
+            # Parse and validate response using Pydantic
+            result = self._parse_and_validate_response(
+                response.text,
+                JourneyStructureResult,
+                fallback_to_dict=True
+            )
 
             if not result:
                 logger.error("JSON parsing returned empty result for journey structuring")
@@ -1447,7 +1493,7 @@ class TaskOrchestrator:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_json_schema=TIMELINE_SCHEMA,
+                    response_json_schema=TimelineResult.model_json_schema(),
                     # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
@@ -1460,13 +1506,18 @@ class TaskOrchestrator:
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_json_schema=TIMELINE_SCHEMA
+                        response_json_schema=TimelineResult.model_json_schema()
                     )
                 )
             else:
                 raise
         
-        result = self._parse_json_response(response.text)
+        # Parse and validate response using Pydantic
+        result = self._parse_and_validate_response(
+            response.text,
+            TimelineResult,
+            fallback_to_dict=True
+        )
         
         # Save timeline data to database
         from app.db.session import get_db
@@ -1542,7 +1593,7 @@ class TaskOrchestrator:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_json_schema=DOCUMENTARY_SCHEMA
+                    response_json_schema=DocumentaryResult.model_json_schema()
                 )
             )
         except Exception as e:
@@ -1555,7 +1606,8 @@ class TaskOrchestrator:
                     model="gemini-3-flash-preview",
                     contents=prompt,
                     config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
+                        response_mime_type="application/json",
+                        response_json_schema=DocumentaryResult.model_json_schema()
                     )
                 )
             except Exception as retry_error:
@@ -1575,7 +1627,12 @@ class TaskOrchestrator:
         task.message = "Finalising documentary structure..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        result = self._parse_json_response(response.text)
+        # Parse and validate response using Pydantic
+        result = self._parse_and_validate_response(
+            response.text,
+            DocumentaryResult,
+            fallback_to_dict=True
+        )
         
         # Save documentary data to database
         from app.db.session import get_db
@@ -1745,7 +1802,11 @@ Ensure the output is comprehensive, accurate, and provides a complete picture of
 """
     
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
-        """Parse JSON response from Gemini, handling markdown code blocks."""
+        """Parse JSON response from Gemini, handling markdown code blocks.
+        
+        This is a basic JSON parser for legacy compatibility.
+        For production use, prefer _parse_and_validate_response with Pydantic models.
+        """
         if not text or not isinstance(text, str):
             logger.warning("Empty or invalid text provided for JSON parsing")
             return {}
@@ -1771,6 +1832,83 @@ Ensure the output is comprehensive, accurate, and provides a complete picture of
             logger.error(f"Failed to parse JSON: {e}")
             logger.error(f"Raw text: {text[:500]}...")
             return {}
+    
+    def _parse_and_validate_response(
+        self, 
+        text: str, 
+        model_class: type,
+        fallback_to_dict: bool = True
+    ) -> Dict[str, Any]:
+        """Parse and validate JSON response from Gemini using Pydantic models.
+        
+        This is the production-grade approach for Gemini structured output parsing.
+        It provides:
+        1. JSON parsing with markdown code block handling
+        2. Pydantic validation for type safety and data integrity
+        3. Automatic conversion to dictionary for downstream compatibility
+        4. Graceful fallback to basic JSON parsing if validation fails
+        
+        Args:
+            text: Raw response text from Gemini API
+            model_class: Pydantic model class for validation (e.g., ProfileExtractionResult)
+            fallback_to_dict: If True, fall back to basic JSON parsing on validation error
+            
+        Returns:
+            Validated data as dictionary, or empty dict on failure
+        """
+        if not text or not isinstance(text, str):
+            logger.warning("Empty or invalid text provided for Pydantic parsing")
+            return {}
+        
+        # Clean markdown code blocks
+        text = text.strip()
+        if text.startswith('```json'):
+            text = text[7:]
+        if text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        text = text.strip()
+        
+        if not text:
+            logger.warning("Text is empty after cleaning")
+            return {}
+        
+        try:
+            # Try Pydantic validation first (production-grade approach)
+            validated_model = model_class.model_validate_json(text)
+            
+            # Convert to dictionary, excluding None values for cleaner output
+            result = validated_model.model_dump(exclude_none=True)
+            
+            logger.info(
+                f"Successfully validated {model_class.__name__} with keys: "
+                f"{list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            )
+            return result
+            
+        except Exception as validation_error:
+            logger.warning(
+                f"Pydantic validation failed for {model_class.__name__}: {validation_error}"
+            )
+            
+            if fallback_to_dict:
+                # Fallback to basic JSON parsing
+                logger.info("Falling back to basic JSON parsing...")
+                try:
+                    result = json.loads(text)
+                    logger.info(
+                        f"Fallback JSON parsing succeeded with keys: "
+                        f"{list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+                    )
+                    return result if isinstance(result, dict) else {}
+                except json.JSONDecodeError as json_error:
+                    logger.error(f"Fallback JSON parsing also failed: {json_error}")
+                    logger.error(f"Raw text: {text[:500]}...")
+                    return {}
+            else:
+                logger.error(f"No fallback enabled, returning empty dict")
+                return {}
     
     # Update Broadcasting
     def register_callback(self, job_id: str, callback: Callable) -> None:
