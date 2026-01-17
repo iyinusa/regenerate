@@ -4,6 +4,7 @@ This module contains all prompts related to profile data extraction
 and enrichment using Gemini 3 Pro.
 """
 
+import json
 from typing import Dict, Any
 
 
@@ -107,63 +108,134 @@ PROFILE_EXTRACTION_SCHEMA: Dict[str, Any] = {
             "type": "object",
             "description": "Other social media links",
             "additionalProperties": {"type": "string"}
+        },
+        "related_links": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Full URL of the related content"},
+                    "title": {"type": "string", "description": "Title of the page or article"},
+                    "type": {"type": "string", "enum": ["article", "blog", "portfolio", "project", "social", "mention", "other"], "description": "Type of content"},
+                    "description": {"type": "string", "description": "Brief description of the content"},
+                    "source": {"type": "string", "description": "Publisher or platform name"}
+                },
+                "required": ["url", "type"]
+            },
+            "description": "Related links discovered about the person (articles, mentions, portfolio pages, etc.)"
         }
     },
     "required": ["name"]
 }
 
 
-def get_profile_extraction_prompt(url: str) -> str:
+def get_profile_extraction_prompt(url: str, is_linkedin_oauth: bool = False, oauth_data: Dict[str, Any] = None) -> str:
     """Generate the profile extraction prompt for Gemini 3.
     
     Args:
         url: The profile URL to extract data from
+        is_linkedin_oauth: Whether LinkedIn OAuth data is available
+        oauth_data: LinkedIn OAuth data if available
         
     Returns:
         Formatted prompt string for Gemini 3
     """
+    # Build the base prompt with LinkedIn-specific handling
+    if is_linkedin_oauth and oauth_data:
+        oauth_info = f"""
+**LINKEDIN OAUTH DATA AVAILABLE:**
+You have limited LinkedIn OAuth data:
+{json.dumps(oauth_data, indent=2)}
+
+This provides: firstname, lastname, picture, member ID, and email.
+You MUST supplement this with Google Search to build a rich profile.
+"""
+    else:
+        oauth_info = ""
+    
     return f"""You are a precise data extraction assistant using Gemini 3. Your goal is to build a COMPREHENSIVE profile for the person identified by the URL.
 
-**CORE DIRECTIVE: DEEP SEARCH & AGGREGATE**
-The provided URL is just the starting point. You MUST use Google Search to find and aggregate data from other public sources (Personal Website, GitHub, Twitter/X, Articles, Interviews, Event Speaking) to build a complete profile.
+{oauth_info}
 
-**CRITICAL DATA INTEGRITY RULES (STRICT):**
-1. **IDENTITY ANCHOR:** The person is defined ONLY by the URL provided: {url}
-2. **PRIMARY SOURCE:** First, use the URL Context tool to read the page content.
-3. **ACTIVE SEARCH:**
-   - **MANDATORY:** Use `google_search` to find external sources. Search for "[Name] personal website", "[Name] github", "[Name] blog", "[Name] projects".
-   - **AGGREGATION:** If you find a verified personal website or portfolio, extract details (Bio, Projects, Skills) from verified search snippets to enrich the profile.
-4. **STRICT VERIFICATION (ANTI-HALLUCINATION):**
-   - **USERNAME TRAP:** If URL has username 'iyinusa' and search finds 'iaboyeji', **DO NOT MERGE** unless you find a "Bridge Link" (e.g., a website linking to BOTH).
-   - **NAME COLLISIONS:** Verify identity using (Company + Title + Location). If they don't match, DISCARD the extra source.
-   - **ZERO TRUST:** If you are not 100% sure a result belongs to THIS person, ignore it.
+**CORE DIRECTIVE: DEEP SEARCH & LINK DISCOVERY**
+The provided URL is just the starting point. You MUST use Google Search (and URL Context for non-LinkedIn URLs) to:
+1. Find and aggregate data from public sources (Personal Website, GitHub, Twitter/X, Portfolio, Blog)
+2. **CRITICAL:** Discover and extract ALL relevant links about this person including:
+   - Article mentions (news, interviews, features)
+   - Blog posts they wrote or are featured in
+   - Speaking engagements or event appearances
+   - Project showcases
+   - Social media profiles
+   - Portfolio pages
+   - Any public mentions or references
 
 **URL TO ANALYZE:** {url}
 
-**EXTRACTION TASK (Enrich with Search Results):**
-- name: Full name (from Anchor URL)
-- title: Current professional title (Verify via Search if outdated)
-- location: Geographic location
-- bio: Comprehensive professional summary (Combine Anchor URL bio + Search results from interviews/personal site).
-- experiences: Work history. (MANDATORY: Capture start/end dates for timeline reconstruction).
-- education: Educational history. (Capture dates of study).
-- skills: Commercial and technical skills (Aggregate from all verified sources).
-- projects: Notable public projects (MANDATORY: Capture dates to place on professional timeline).
-- achievements: Publicly verifiable awards and recognitions (MANDATORY: Capture dates/year for chronological storytelling).
-- certifications: Professional certifications.
-- email: Professional contact email (Only if publicly visible).
-- website: Personal website/Portfolio (PRIORITY: Search for this).
-- linkedin: The correct LinkedIn URL.
-- github: GitHub URL (Verify identity match carefully).
-- social_links: Twitter/X, Medium, Substack (Verify identity).
+**TWO-PHASE EXTRACTION:**
 
-**TIMELINE FOCUS:** 
-The primary goal is to "retell the story" via a visual timeline and documentary video. For EVERY experience, achievement, and project, you MUST strive to find associated dates (Month/Year or just Year). A journey cannot be told without a chronological anchor.
+**Phase 1: Basic Profile Data & Link Discovery**
+Extract the standard profile fields:
+- name: Full name
+- title: Current professional title
+- location: Geographic location
+- bio: Professional summary
+- experiences: Work history (with start/end dates)
+- education: Educational history (with dates)
+- skills: Technical and soft skills
+- projects: Notable projects (with dates)
+- achievements: Awards and recognitions (with dates/year)
+- certifications: Professional certifications
+- email: Contact email (if publicly visible)
+- website: Personal website/Portfolio
+- linkedin: LinkedIn URL
+- github: GitHub URL
+- social_links: Other social profiles (Twitter/X, Medium, etc.)
+
+**Phase 2: LINK EXTRACTION (CRITICAL FOR ENRICHMENT)**
+You MUST also extract a comprehensive list of related links:
+- related_links: Array of objects with:
+  - url: The full URL
+  - title: Page/article title
+  - type: "article", "blog", "portfolio", "project", "social", "mention", "other"
+  - description: Brief description of the content
+  - source: Publisher/platform name if identifiable
+  
+**EXCLUSION:** Do NOT include the primary source URL ({url}) in related_links - only additional discovered links.
+
+**LINK DISCOVERY STRATEGY:**
+1. For LinkedIn URLs: Use ONLY Google Search (not url_context) to find mentions
+2. For other URLs: Use BOTH url_context AND google_search
+3. SMART SEARCH QUERIES (use person's name + company if known):
+   - "[Person Name] [Company] awards recognition"
+   - "[Person Name] [Company] interview podcast"
+   - "[Person Name] [Company] published article blog"
+   - "[Person Name] [Company] speaking conference presentation"
+   - "[Person Name] [Company] portfolio projects work"
+   - "[Person Name] [Company] featured mentioned press"
+   - "[Person Name] [Company] github repository code"
+   - "[Person Name] [Company] linkedin profile about"
+   - "[Person Name] [Title/Role] industry insights"
+   - "[Person Name] [Title/Role] expert opinion"
+
+**LINK INTELLIGENCE REQUIREMENTS:**
+- Return DIRECT links to specific pages that mention the person (not homepage/base URLs)
+- Example: Return "https://techblog.com/interview-with-john-doe-2024" NOT "https://techblog.com"
+- Prioritize content-rich pages: awards, interviews, publications, articles, project showcases, conference talks
+- Include publication dates in descriptions when visible
+- Focus on recent content (last 3-5 years) but include significant older achievements
+- Target 10-20 high-quality specific links rather than 5 general ones
+
+**CRITICAL DATA INTEGRITY RULES:**
+1. **IDENTITY ANCHOR:** The person is defined ONLY by the URL: {url}
+2. **STRICT VERIFICATION:** Verify identity using (Name and/or Company), can also consider Title (but not too strict)
+3. **NO HALLUCINATION:** If unsure a link belongs to THIS person, exclude it
+4. **TIMELINE FOCUS:** Capture dates for ALL awards, experiences, publication, achievements, projects, etc
 
 **VERIFICATION:**
-Before adding any field, ask: "Is this definitely the same person?"
+Before adding any field or link, ask: "Is this definitely the same person?"
 
-Return a JSON object. Use null for missing string fields and empty arrays [] for missing list fields."""
+Return a JSON object. Use null for missing string fields and empty arrays [] for missing list fields.
+Include the "related_links" array with all discovered links for enrichment."""
 
 
 def get_profile_enrichment_prompt(existing_data: Dict[str, Any], additional_urls: list) -> str:

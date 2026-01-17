@@ -14,8 +14,20 @@ interface SkillsSectionProps {
 }
 
 const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, sectionIndex }) => {
+  // Handle both legacy and new skills_evolution format
   const skillsEvolution = journey?.skills_evolution || [];
   const bubbleChartRef = useRef<HTMLDivElement>(null);
+
+  // Debug logging to help troubleshoot
+  useEffect(() => {
+    if (journey) {
+      console.log('Journey data in SkillsSection:', {
+        hasSkillsEvolution: !!journey.skills_evolution,
+        skillsEvolutionLength: journey.skills_evolution?.length || 0,
+        skillsEvolutionData: journey.skills_evolution?.slice(0, 2) // First 2 items for debugging
+      });
+    }
+  }, [journey]);
 
   // Categorize skills
   const categorizedSkills = categorizeSkills(skills);
@@ -278,16 +290,19 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, sectionI
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                 >
-                  <div className="evolution-period">{evolution.period || evolution.year}</div>
+                  <div className="evolution-period">{evolution.period || evolution.year || evolution.acquired_date || 'N/A'}</div>
                   <div className="evolution-content">
-                    <h5>{evolution.milestone || evolution.stage}</h5>
-                    <p>{evolution.description}</p>
-                    {evolution.skills_acquired && (
+                    <h5>{evolution.milestone || evolution.stage || evolution.skill || 'Skill Development'}</h5>
+                    <p>{evolution.description || evolution.proficiency_growth || 'Skills development phase'}</p>
+                    {(evolution.skills_acquired || (evolution.skill && [evolution.skill])) && (
                       <div className="acquired-skills">
-                        {evolution.skills_acquired.map((skill: string, i: number) => (
+                        {(evolution.skills_acquired || [evolution.skill]).map((skill: string, i: number) => (
                           <span key={i} className="acquired-tag">+{skill}</span>
                         ))}
                       </div>
+                    )}
+                    {evolution.context && (
+                      <p className="evolution-context">{evolution.context}</p>
                     )}
                   </div>
                 </motion.div>

@@ -212,15 +212,28 @@ class ProfileExtractionService:
                 timeline_data = result_data.get("generate_timeline", {})
                 documentary_data = result_data.get("generate_documentary", {})
                 
+                # Debug logging for journey components
+                logger.info(f"Journey data extraction - job_id: {job_id}")
+                logger.info(f"  - Journey data: {bool(journey_data)} ({len(journey_data) if journey_data else 0} keys)")
+                logger.info(f"  - Timeline data: {bool(timeline_data)} ({len(timeline_data) if timeline_data else 0} keys)")
+                logger.info(f"  - Documentary data: {bool(documentary_data)} ({len(documentary_data) if documentary_data else 0} keys)")
+                logger.info(f"  - Available task results: {list(result_data.keys())}")
+                
+                # Check for error/warning indicators in the data
+                for name, data in [("journey", journey_data), ("timeline", timeline_data), ("documentary", documentary_data)]:
+                    if isinstance(data, dict) and ('error' in data or 'warning' in data):
+                        logger.warning(f"{name.capitalize()} data contains issues: {data.get('error') or data.get('warning')}")
+                
                 # If plan completed normally, update job with full data
                 if plan.status == TaskStatus.COMPLETED:
-                    # Save comprehensive data to database
+                    # Save comprehensive data to database with all task results
                     await self._save_comprehensive_data_to_database(
                         history_id, 
                         profile_data, 
                         journey_data, 
                         timeline_data, 
-                        documentary_data
+                        documentary_data,
+                        result_data  # Pass all task results for raw_data tracking
                     )
                     
                     profile_jobs[job_id].update({
@@ -242,7 +255,8 @@ class ProfileExtractionService:
                             profile_data,
                             journey_data,
                             timeline_data,
-                            documentary_data
+                            documentary_data,
+                            result_data  # Pass all task results even for failed cases
                         )
                     
                     profile_jobs[job_id].update({
@@ -338,7 +352,8 @@ class ProfileExtractionService:
         profile_data: Dict[str, Any],
         journey_data: Dict[str, Any],
         timeline_data: Dict[str, Any],
-        documentary_data: Dict[str, Any]
+        documentary_data: Dict[str, Any],
+        all_task_results: Optional[Dict[str, Any]] = None
     ) -> None:
         """Save comprehensive data including journey components to database.
         
@@ -348,6 +363,7 @@ class ProfileExtractionService:
             journey_data: Journey structure data
             timeline_data: Timeline data
             documentary_data: Documentary data
+            all_task_results: Complete task execution results for raw_data tracking
         """
         try:
             from app.db.session import async_session_maker
@@ -357,22 +373,52 @@ class ProfileExtractionService:
                     comprehensive_data = {
                         **{k: v for k, v in profile_data.items() 
                            if k not in ['raw_data', 'source_url', 'extraction_timestamp']},
-                        "journey": journey_data,
-                        "timeline": timeline_data,
-                        "documentary": documentary_data,
+                        "journey": journey_data if journey_data else {"status": "not_generated"},
+                        "timeline": timeline_data if timeline_data else {"status": "not_generated"},
+                        "documentary": documentary_data if documentary_data else {"status": "not_generated"},
                         "generated_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    # Add generation status metadata
+                    comprehensive_data["generation_status"] = {
+                        "journey_generated": bool(journey_data and not journey_data.get('error')),
+                        "timeline_generated": bool(timeline_data and not timeline_data.get('error')),
+                        "documentary_generated": bool(documentary_data and not documentary_data.get('error')),
+                        "has_warnings": any(
+                            data.get('warning') for data in [journey_data, timeline_data, documentary_data] 
+                            if isinstance(data, dict)
+                        )
+                    }
+                    
+                    # Build comprehensive raw_data with all steps
+                    raw_data_comprehensive = {
+                        "profile_extraction": profile_data.get("raw_data", {}),
+                        "all_task_results": all_task_results or {},
+                        "processing_steps": {
+                            "fetch_profile": all_task_results.get("fetch_profile", {}) if all_task_results else {},
+                            "enrich_profile": all_task_results.get("enrich_profile", {}) if all_task_results else {},
+                            "aggregate_history": all_task_results.get("aggregate_history", {}) if all_task_results else {},
+                            "structure_journey": all_task_results.get("structure_journey", {}) if all_task_results else {},
+                            "generate_timeline": all_task_results.get("generate_timeline", {}) if all_task_results else {},
+                            "generate_documentary": all_task_results.get("generate_documentary", {}) if all_task_results else {}
+                        },
+                        "captured_at": datetime.utcnow().isoformat()
                     }
                     
                     await db.execute(
                         update(ProfileHistory)
                         .where(ProfileHistory.id == history_id)
                         .values(
-                            raw_data=profile_data.get("raw_data", {}),
+                            raw_data=raw_data_comprehensive,
                             structured_data=comprehensive_data
                         )
                     )
                     await db.commit()
                     logger.info(f"Saved comprehensive data to database for history_id: {history_id}")
+                    logger.info(f"  - Profile data keys: {list(profile_data.keys()) if profile_data else 'None'}")
+                    logger.info(f"  - Journey status: {'saved' if journey_data else 'empty'} - {len(journey_data) if journey_data else 0} keys")
+                    logger.info(f"  - Timeline status: {'saved' if timeline_data else 'empty'} - {len(timeline_data) if timeline_data else 0} keys")
+                    logger.info(f"  - Documentary status: {'saved' if documentary_data else 'empty'} - {len(documentary_data) if documentary_data else 0} keys")
             else:
                 logger.warning("Database session maker not available")
         except Exception as db_error:

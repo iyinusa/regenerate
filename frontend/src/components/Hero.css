@@ -41,15 +41,14 @@
 	margin-left: 0.5rem;
 }
 
-.hero-title {
+.mhero-title {
 	font-family: 'Nunito Sans', sans-serif;
-	font-size: clamp(3.5rem, 12vw, 8rem);
+	font-size: clamp(3rem, 7vw, 5rem);
 	font-weight: 900;
 	line-height: 0.9;
-	margin-bottom: 2rem;
+	margin-bottom: 3rem;
 	color: #fff;
 	letter-spacing: -0.05em;
-	text-transform: uppercase;
 }
 
 .gradient-text {
@@ -59,13 +58,13 @@
 	display: inline-block;
 }
 
-.hero-subtitle {
+.mhero-subtitle {
 	font-family: 'Nunito Sans', sans-serif;
 	font-size: 1.5rem;
 	line-height: 1.4;
 	color: rgba(255, 255, 255, 0.6);
 	max-width: 700px;
-	margin-bottom: 4rem;
+	margin-bottom: 6rem;
 	font-weight: 400;
 }
 
@@ -292,12 +291,12 @@
 .bottom-right { bottom: -20%; right: -20%; background: radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, rgba(0, 0, 0, 0) 70%); }
 
 @media (max-width: 1024px) {
-	.hero-title { font-size: 5rem; }
+	.mhero-title { font-size: 5rem; }
 	.features-grid { grid-template-columns: 1fr; gap: 4rem; }
 }
 
 @media (max-width: 768px) {
-	.hero-title { font-size: 3.5rem; }
+	.mhero-title { font-size: 3.5rem; }
 	.input-wrapper { flex-direction: column; border-radius: 20px; padding: 1.5rem; }
 	.cli-prefix { display: none; }
 	.cli-input { width: 100%; text-align: center; }

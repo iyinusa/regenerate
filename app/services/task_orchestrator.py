@@ -201,7 +201,7 @@ class TaskOrchestrator:
             name="Extracting Profile Data",
             description="Using Gemini 3 to fetch and analyze profile data from the source URL",
             order=1,
-            estimated_seconds=45,
+            estimated_seconds=60,
             critical=True,
             dependencies=[],
         ))
@@ -213,7 +213,7 @@ class TaskOrchestrator:
             name="Enriching Profile",
             description="Discovering and aggregating data from related sources",
             order=2,
-            estimated_seconds=60,
+            estimated_seconds=30,
             critical=False,  # Can continue without enrichment
             dependencies=["task_001"],
         ))
@@ -225,7 +225,7 @@ class TaskOrchestrator:
             name="Aggregating History",
             description="Merging with existing profile history for comprehensive view",
             order=3,
-            estimated_seconds=60,
+            estimated_seconds=25,
             critical=False,
             dependencies=["task_002"],
         ))
@@ -237,8 +237,8 @@ class TaskOrchestrator:
             name="Structuring Journey",
             description="Transforming profile data into a compelling narrative structure",
             order=4,
-            estimated_seconds=35,
-            critical=True,
+            estimated_seconds=20,
+            critical=False,  # Non-critical: enhancement feature
             dependencies=["task_003"],
         ))
         
@@ -249,9 +249,9 @@ class TaskOrchestrator:
             name="Generating Timeline",
             description="Creating interactive timeline visualization data",
             order=5,
-            estimated_seconds=45,
-            critical=True,
-            dependencies=["task_004"],
+            estimated_seconds=20,
+            critical=False,  # Non-critical: enhancement feature
+            dependencies=["task_001", "task_004"], 
         ))
         
         # Task 6: Generate Documentary
@@ -261,9 +261,9 @@ class TaskOrchestrator:
             name="Creating Documentary",
             description="Crafting documentary narrative and video segments",
             order=6,
-            estimated_seconds=60,
-            critical=True,
-            dependencies=["task_004", "task_005"],
+            estimated_seconds=20,
+            critical=False,  # Non-critical: enhancement feature
+            dependencies=["task_001", "task_004"], 
         ))
         
         return tasks
@@ -304,9 +304,12 @@ class TaskOrchestrator:
                 
                 # Check for critical failure
                 if task.status == TaskStatus.FAILED and task.critical:
-                    logger.error(f"Critical task {task.task_id} failed, aborting plan")
+                    logger.error(f"Critical task {task.task_id} ({task.task_type.value}) failed, aborting plan")
                     plan.status = TaskStatus.FAILED
                     break
+                elif task.status == TaskStatus.FAILED and not task.critical:
+                    logger.warning(f"Non-critical task {task.task_id} ({task.task_type.value}) failed, continuing with plan")
+                    # Continue execution for non-critical failures
             
             # Mark plan as completed if no critical failures
             if plan.status != TaskStatus.FAILED:
@@ -352,8 +355,14 @@ class TaskOrchestrator:
             task.completed_at = datetime.utcnow()
             task.message = "Completed successfully"
             
-            # Store result in plan
+            # Store result in plan (even if it contains errors/warnings)
             plan.result_data[task.task_type.value] = result
+            
+            # Log result for debugging
+            if isinstance(result, dict) and ('error' in result or 'warning' in result):
+                logger.warning(f"Task {task.task_id} completed with issues: {result.get('error') or result.get('warning')}")
+            else:
+                logger.info(f"Task {task.task_id} completed successfully with result keys: {list(result.keys()) if isinstance(result, dict) else 'non-dict result'}")
             
             await self._broadcast_update(job_id, "task_completed", {
                 "task": task.to_dict(),
@@ -446,7 +455,7 @@ class TaskOrchestrator:
         from sqlalchemy import select
         
         task.message = "Detected LinkedIn profile, checking authentication..."
-        task.progress = 20
+        task.progress = 10
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         linkedin_access_token = None
@@ -471,6 +480,10 @@ class TaskOrchestrator:
                 finally:
                     break
         
+        task.progress = 20
+        task.message = "Preparing profile fetch..."
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
         if linkedin_access_token:
             # Use authenticated LinkedIn API
             return await self._handle_linkedin_authenticated(
@@ -489,45 +502,45 @@ class TaskOrchestrator:
         source_url: str,
         access_token: str
     ) -> Dict[str, Any]:
-        """Handle LinkedIn profile with OAuth authentication."""
+        """Handle LinkedIn profile with OAuth authentication.
+        
+        New Flow: Combine limited OAuth data with Google Search for rich profile.
+        LinkedIn OAuth only provides: firstname, lastname, picture, member ID, email.
+        """
         from app.services.linkedin_service import linkedin_service
         
-        task.message = "Fetching LinkedIn profile..."
-        task.progress = 40
+        task.message = "Fetching LinkedIn OAuth data..."
+        task.progress = 30
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        # Fetch profile data using OAuth
+        # Fetch limited profile data using OAuth
         linkedin_data = await linkedin_service.fetch_authenticated_profile(
             access_token=access_token,
-            include_positions=True,
-            include_education=True,
-            include_skills=True
+            include_positions=False,  # Not available in limited API
+            include_education=False,  # Not available in limited API
+            include_skills=False  # Not available in limited API
         )
         
         if not linkedin_data.get("success"):
             # Fall back to unauthenticated if OAuth fails
-            logger.warning(f"LinkedIn OAuth failed: {linkedin_data.get('error')}, falling back to scraping")
+            logger.warning(f"LinkedIn OAuth failed: {linkedin_data.get('error')}, falling back to search")
             return await self._handle_linkedin_unauthenticated(job_id, task, source_url)
         
-        task.progress = 60
-        task.message = "Processing LinkedIn data..."
+        task.progress = 50
+        task.message = "Enriching with Google Search..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        # Use Gemini to process the LinkedIn API response
-        prompt = f"""Extract professional profile details from this LinkedIn API response.
-Also, use Google Search to find their personal portfolio, GitHub, or other professional presence.
-
-LinkedIn API Data:
-{json.dumps(linkedin_data.get('data', {}), indent=2)}
-
-Source URL: {source_url}
-
-Extract and structure all professional information including:
-- Basic profile information (name, title, location)
-- Work experience with dates and descriptions
-- Education history
-- Skills and endorsements
-- Any additional context found via Google Search"""
+        # Extract basic info from OAuth
+        oauth_basic = linkedin_data.get('data', {}).get('basic_profile', {})
+        
+        # Use Gemini with Google Search ONLY to build rich profile
+        # Combine the limited OAuth data with comprehensive search results
+        from app.prompts import get_profile_extraction_prompt
+        prompt = get_profile_extraction_prompt(
+            url=source_url,
+            is_linkedin_oauth=True,
+            oauth_data=oauth_basic
+        )
 
         try:
             response = await asyncio.to_thread(
@@ -535,10 +548,10 @@ Extract and structure all professional information including:
                 model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    tools=[{"google_search": {}}],  # url_context removed - we have the data
+                    tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn OAuth
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -559,9 +572,15 @@ Extract and structure all professional information including:
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         result = self._parse_json_response(response.text)
+        
+        # Ensure OAuth data is included
+        if not result.get('email') and linkedin_data.get('data', {}).get('email'):
+            result['email'] = linkedin_data['data']['email']
+        
         result['source_url'] = source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
-        result['extraction_method'] = 'linkedin_oauth'
+        result['extraction_method'] = 'linkedin_oauth_with_search'
+        result['linkedin'] = source_url
         
         return result
     
@@ -571,114 +590,51 @@ Extract and structure all professional information including:
         task: Task,
         source_url: str
     ) -> Dict[str, Any]:
-        """Handle LinkedIn profile without OAuth (scraping approach)."""
+        """Handle LinkedIn profile without OAuth (using Google Search only).
+        
+        New Flow: For LinkedIn links, use ONLY google_search (not url_context).
+        LinkedIn blocking makes scraping unreliable, so rely on search results.
+        """
+        task.message = "Analysing LinkedIn profile via Search..."
+        task.progress = 40
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Use Google Search as primary source for LinkedIn (no scraping attempt)
         from app.services.linkedin_service import linkedin_service
+        username = linkedin_service.extract_linkedin_username(source_url)
         
-        task.message = "Reading public LinkedIn profile..."
-        task.progress = 30
+        # Build comprehensive search prompt
+        from app.prompts import get_profile_extraction_prompt
+        prompt = get_profile_extraction_prompt(url=source_url, is_linkedin_oauth=False)
+        
+        task.progress = 60
+        task.message = "Searching for profile information..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        # Attempt to scrape the public profile
-        scrape_result = await linkedin_service.scrape_public_profile(source_url)
-        
-        task.progress = 50
-        task.message = "Processing LinkedIn data..."
-        await self._broadcast_update(job_id, "task_progress", task.to_dict())
-        
-        if scrape_result.get("success") and scrape_result.get("raw_html"):
-            # Successfully scraped - pass raw HTML to Gemini
-            raw_html = scrape_result["raw_html"]
-            
-            prompt = f"""Extract professional profile data from this LinkedIn profile HTML.
-Also, use Google Search to find additional news, portfolio links, or professional presence related to this person.
-
-LinkedIn Profile HTML (may be partial):
-{raw_html[:50000]}  # Limit HTML size for token constraints
-
-Source URL: {source_url}
-
-Extract and structure all available professional information including:
-- Name, headline, location
-- Work experience with companies, dates, descriptions
-- Education history
-- Skills
-- Any additional professional context from Google Search"""
-
-            try:
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[{"google_search": {}}],  # Search for additional context
-                        response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                        thinking_config=types.ThinkingConfig(thinking_level="low")
-                    )
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],  # ONLY google_search for LinkedIn
+                    response_mime_type="application/json",
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
-            except Exception as e:
-                logger.warning(f"Gemini extraction with thinking failed: {e}")
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[{"google_search": {}}],
-                        response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    )
+            )
+        except Exception as e:
+            logger.warning(f"Gemini search failed: {e}, trying without thinking config")
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],
+                    response_mime_type="application/json",
+                    response_json_schema=PROFILE_EXTRACTION_SCHEMA,
                 )
-        else:
-            # Scraping failed - use Google Search as primary source
-            error_msg = scrape_result.get("message", "LinkedIn scraping blocked")
-            logger.warning(f"LinkedIn scraping failed: {error_msg}")
-            
-            task.message = "LinkedIn blocked, using AI-powered Search..."
-            await self._broadcast_update(job_id, "task_progress", task.to_dict())
-            
-            # Extract username for search
-            username = linkedin_service.extract_linkedin_username(source_url)
-            
-            prompt = f"""I need to extract professional profile data for a LinkedIn user.
-Direct access to the profile is blocked. Please use Google Search to find information about this person.
-
-LinkedIn Profile URL: {source_url}
-LinkedIn Username: {username or 'unknown'}
-
-Search for:
-1. Their name and current job title
-2. Company affiliations
-3. Professional background and experience
-4. Portfolio, GitHub, personal website
-5. News articles or publications
-6. Speaking engagements or contributions
-
-Compile all found information into a structured profile."""
-
-            try:
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[{"google_search": {}}],
-                        response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                        thinking_config=types.ThinkingConfig(thinking_level="low")
-                    )
-                )
-            except Exception as e:
-                logger.warning(f"Gemini search failed: {e}")
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[{"google_search": {}}],
-                        response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    )
-                )
+            )
         
         task.progress = 80
         task.message = "Processing response..."
@@ -687,8 +643,9 @@ Compile all found information into a structured profile."""
         result = self._parse_json_response(response.text)
         result['source_url'] = source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
-        result['extraction_method'] = 'linkedin_scrape_or_search'
-        result['linkedin_auth_recommended'] = True  # Flag to suggest OAuth
+        result['extraction_method'] = 'linkedin_search'
+        result['linkedin'] = source_url
+        result['linkedin_auth_recommended'] = True  # Flag to suggest OAuth for better data
         
         return result
     
@@ -699,12 +656,13 @@ Compile all found information into a structured profile."""
         task: Task,
         source_url: str
     ) -> Dict[str, Any]:
-        """Handle non-LinkedIn profile extraction using url_context."""
+        """Handle non-LinkedIn profile extraction using both url_context and google_search."""
         task.message = "Extracting profile data..."
         task.progress = 40
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        prompt = get_profile_extraction_prompt(source_url)
+        from app.prompts import get_profile_extraction_prompt
+        prompt = get_profile_extraction_prompt(url=source_url, is_linkedin_oauth=False)
         
         # Try with thinking config first, fall back without if not supported
         try:
@@ -713,12 +671,10 @@ Compile all found information into a structured profile."""
                 model="gemini-3-flash-preview",
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    tools=[{"url_context": {}}, {"google_search": {}}],
+                    tools=[{"url_context": {}}, {"google_search": {}}],  # Both tools for non-LinkedIn
                     response_mime_type="application/json",
                     response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="low"),
-                    # Ensure it can read fine print in portfolio images/resumes
-                    media_resolution="high"
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -731,9 +687,7 @@ Compile all found information into a structured profile."""
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                        # Ensure it can read fine print in portfolio images/resumes
-                        media_resolution="high"
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
                     )
                 )
             elif "model" in str(e).lower() and "not found" in str(e).lower():
@@ -745,9 +699,7 @@ Compile all found information into a structured profile."""
                     config=types.GenerateContentConfig(
                         tools=[{"url_context": {}}, {"google_search": {}}],
                         response_mime_type="application/json",
-                        response_json_schema=PROFILE_EXTRACTION_SCHEMA,
-                        # Ensure it can read fine print in portfolio images/resumes
-                        media_resolution="high"
+                        response_json_schema=PROFILE_EXTRACTION_SCHEMA
                     )
                 )
             else:
@@ -760,19 +712,20 @@ Compile all found information into a structured profile."""
         result = self._parse_json_response(response.text)
         result['source_url'] = plan.source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
+        result['extraction_method'] = 'standard_with_search'
         
         return result
     
     async def _handle_enrich_profile(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
-        """Handle profile enrichment task with GitHub integration.
+        """Handle profile enrichment task with web scraping.
         
-        Discovers and aggregates data from related sources including:
-        - GitHub repositories and contributions (if authenticated)
-        - Additional URLs found in profile
-        - Google Search for additional context
+        New Flow:
+        1. Get profile data from FETCH_PROFILE (includes related_links)
+        2. Use BeautifulSoup scraper to extract rich content from all related links
+        3. Combine scraped data with profile for next stage (AGGREGATE_HISTORY will use this)
         """
-        task.message = "Discovering additional sources..."
-        task.progress = 20
+        task.message = "Starting enrichment process..."
+        task.progress = 10
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Get profile data from previous task
@@ -780,36 +733,105 @@ Compile all found information into a structured profile."""
         if not profile_data or not isinstance(profile_data, dict):
             profile_data = {}
         
-        guest_user_id = plan.options.get('guest_user_id')
-        enriched_data = {**profile_data}
-        sources_enriched = []
+        # Extract related links discovered by Gemini
+        related_links = profile_data.get('related_links', [])
         
-        # Check for GitHub OAuth and enrich with repository data
+        task.progress = 20
+        task.message = f"Found {len(related_links)} related links to enrich"
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        enriched_data = {**profile_data}
+        scraped_content = []
+        
+        # Scrape content from related links using BeautifulSoup
+        if related_links:
+            task.progress = 30
+            task.message = "Scraping content from related links..."
+            await self._broadcast_update(job_id, "task_progress", task.to_dict())
+            
+            from app.services.web_scraper import web_scraper
+            
+            # Extract URLs, excluding the primary source URL
+            primary_url = profile_data.get('source_url', '')
+            urls_to_scrape = [
+                link['url'] for link in related_links 
+                if link.get('url') and link['url'] != primary_url
+            ]
+            
+            # Limit to top 20 links to allow more comprehensive enrichment
+            urls_to_scrape = urls_to_scrape[:20]
+            
+            logger.info(f"Scraping {len(urls_to_scrape)} URLs for enrichment")
+            
+            try:
+                # Scrape all URLs concurrently with rate limiting
+                scraped_results = await web_scraper.scrape_multiple_urls(
+                    urls=urls_to_scrape,
+                    max_concurrent=5  # Increased concurrency for better throughput
+                )
+                
+                # Filter successful scrapes and format for Gemini
+                for result in scraped_results:
+                    if result.get('success'):
+                        scraped_content.append({
+                            'url': result['url'],
+                            'title': result.get('title', ''),
+                            'description': result.get('description', ''),
+                            'content': result.get('content', '')[:3000],  # Increased content limit for richer context
+                            'author': result.get('author', ''),
+                            'publisher': result.get('publisher', ''),
+                            'domain': result.get('domain', ''),
+                            'published_date': result.get('published_date', result.get('publication_date', '')),
+                            'featured_image': result.get('featured_image', ''),
+                            'headings': result.get('headings', [])[:8],  # More headings for better context
+                            'quality_score': result.get('quality_score', 5.0),  # Quality score for prioritization
+                        })
+                
+                # Sort scraped content by quality score (descending) to prioritize best content
+                scraped_content = sorted(scraped_content, key=lambda x: x.get('quality_score', 5.0), reverse=True)
+                
+                logger.info(f"Successfully scraped {len(scraped_content)} out of {len(urls_to_scrape)} URLs (sorted by quality)")
+                if scraped_content:
+                    avg_quality = sum(item.get('quality_score', 5.0) for item in scraped_content) / len(scraped_content)
+                    logger.info(f"Average content quality score: {avg_quality:.2f}/10.0")
+                
+            except Exception as scrape_error:
+                logger.error(f"Error during web scraping: {scrape_error}")
+                # Continue without scraped data
+        
+        task.progress = 60
+        task.message = f"Scraped {len(scraped_content)} articles/pages"
+        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+        
+        # Add scraped content to enriched data
+        enriched_data['scraped_content'] = scraped_content
+        enriched_data['enrichment_stats'] = {
+            'related_links_found': len(related_links),
+            'links_scraped': len(urls_to_scrape) if related_links else 0,
+            'successful_scrapes': len(scraped_content),
+        }
+        
+        # Check for GitHub OAuth enrichment
+        guest_user_id = plan.options.get('guest_user_id')
         if guest_user_id:
+            task.progress = 70
+            task.message = "Checking GitHub integration..."
+            await self._broadcast_update(job_id, "task_progress", task.to_dict())
+            
             github_enrichment = await self._enrich_with_github(guest_user_id, task, job_id)
             if github_enrichment:
                 enriched_data['github_data'] = github_enrichment
-                sources_enriched.append('github_oauth')
+                enriched_data['enrichment_stats']['github_enriched'] = True
         
-        task.progress = 50
-        task.message = "Checking additional profile URLs..."
-        await self._broadcast_update(job_id, "task_progress", task.to_dict())
-        
-        # Check for additional URLs to enrich from
-        additional_urls = []
-        if profile_data.get('website'):
-            additional_urls.append(profile_data['website'])
-        if profile_data.get('github') and 'github_oauth' not in sources_enriched:
-            additional_urls.append(profile_data['github'])
-        
-        task.progress = 70
-        task.message = f"Found {len(additional_urls)} additional sources"
+        task.progress = 90
+        task.message = "Enrichment complete"
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
         # Mark enrichment metadata
         enriched_data['enriched'] = True
-        enriched_data['sources_checked'] = len(additional_urls)
-        enriched_data['sources_enriched'] = sources_enriched
+        enriched_data['enrichment_timestamp'] = datetime.utcnow().isoformat()
+        
+        logger.info(f"Profile enrichment complete: {enriched_data.get('enrichment_stats')}")
         
         return enriched_data
     
@@ -1012,19 +1034,84 @@ Compile all found information into a structured profile."""
                 
                 if not histories or len(histories) == 0:
                     # No previous history found, this is the first record
-                    task.message = "First profile record"
+                    # But we still want to integrate scraped content if available
+                    scraped_content = profile_data.get('scraped_content', [])
                     
-                    # Update the current history record even for first record to ensure persistence
-                    if current_history_id:
-                        current_history = await db.get(ProfileHistory, current_history_id)
-                        if current_history:
-                            current_history.structured_data = profile_data
-                            await db.commit()
-                            logger.info(f"Saved initial profile data to history record {current_history_id}")
-                    
-                    task.progress = 100
-                    await self._broadcast_update(job_id, "task_progress", task.to_dict())
-                    return {**profile_data, "history_checked": True, "aggregated": False, "first_record": True}
+                    if scraped_content and len(scraped_content) > 0:
+                        # First record but has scraped content - enrich with Gemini
+                        task.progress = 70
+                        task.message = f"Enriching first record with {len(scraped_content)} scraped sources..."
+                        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                        
+                        if not self.genai_client:
+                            raise Exception("Gemini client not initialized")
+                        
+                        # Create enrichment prompt
+                        enrichment_prompt = self._create_aggregation_prompt(
+                            current_profile=profile_data,
+                            previous_profiles=[],
+                            scraped_content=scraped_content
+                        )
+                        
+                        try:
+                            response = await asyncio.to_thread(
+                                self.genai_client.models.generate_content,
+                                model="gemini-3-flash-preview",
+                                contents=enrichment_prompt,
+                                config=types.GenerateContentConfig(
+                                    response_mime_type="application/json",
+                                    # thinking_config=types.ThinkingConfig(thinking_level="low")
+                                )
+                            )
+                        except Exception as e:
+                            if "thinking level" in str(e).lower() or "thinking" in str(e).lower():
+                                logger.warning(f"Thinking config not supported: {str(e)}, retrying without")
+                                response = await asyncio.to_thread(
+                                    self.genai_client.models.generate_content,
+                                    model="gemini-3-flash-preview",
+                                    contents=enrichment_prompt,
+                                    config=types.GenerateContentConfig(
+                                        response_mime_type="application/json"
+                                    )
+                                )
+                            else:
+                                raise
+                        
+                        enriched_profile = self._parse_json_response(response.text)
+                        
+                        # Save enriched profile
+                        if current_history_id:
+                            current_history = await db.get(ProfileHistory, current_history_id)
+                            if current_history:
+                                current_history.structured_data = enriched_profile
+                                await db.commit()
+                                logger.info(f"Saved enriched first record to history {current_history_id}")
+                        
+                        task.progress = 100
+                        task.message = "First record enriched with scraped content"
+                        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                        
+                        return {
+                            **enriched_profile,
+                            "history_checked": True,
+                            "aggregated": False,
+                            "enriched_with_scraping": True,
+                            "first_record": True
+                        }
+                    else:
+                        # First record without scraped content
+                        task.message = "First profile record"
+                        
+                        if current_history_id:
+                            current_history = await db.get(ProfileHistory, current_history_id)
+                            if current_history:
+                                current_history.structured_data = profile_data
+                                await db.commit()
+                                logger.info(f"Saved initial profile data to history record {current_history_id}")
+                        
+                        task.progress = 100
+                        await self._broadcast_update(job_id, "task_progress", task.to_dict())
+                        return {**profile_data, "history_checked": True, "aggregated": False, "first_record": True}
                 
                 # Aggregate with Gemini 3
                 task.progress = 70
@@ -1034,19 +1121,34 @@ Compile all found information into a structured profile."""
                 if not self.genai_client:
                     raise Exception("Gemini client not initialized")
                 
-                # Prepare aggregation prompt
-                previous_profiles = [
-                    {
-                        "source": h.source_url,
-                        "data": h.structured_data,
-                        "date": h.created_at.isoformat()
+                # Prepare aggregation prompt with scraped content
+                previous_profiles = []
+                for h in histories:
+                    # Safely extract structured_data, handling None cases
+                    profile_entry = {
+                        "source": h.source_url or "unknown",
+                        "date": h.created_at.isoformat() if h.created_at else None
                     }
-                    for h in histories
+                    # Only include data if structured_data exists and has content
+                    if h.structured_data and isinstance(h.structured_data, dict):
+                        profile_entry["data"] = h.structured_data
+                    else:
+                        profile_entry["data"] = {}
+                    previous_profiles.append(profile_entry)
+                
+                # Filter out entries with empty data to avoid noise in the prompt
+                previous_profiles = [
+                    p for p in previous_profiles 
+                    if p.get("data") and any(p["data"].values())
                 ]
+                
+                # Extract scraped content for enrichment
+                scraped_content = profile_data.get('scraped_content', [])
                 
                 aggregation_prompt = self._create_aggregation_prompt(
                     current_profile=profile_data,
-                    previous_profiles=previous_profiles
+                    previous_profiles=previous_profiles,
+                    scraped_content=scraped_content
                 )
                 
                 task.progress = 80
@@ -1061,7 +1163,7 @@ Compile all found information into a structured profile."""
                         contents=aggregation_prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
-                            thinking_config=types.ThinkingConfig(thinking_level="low")
+                            # thinking_config=types.ThinkingConfig(thinking_level="low")
                         )
                     )
                 except Exception as e:
@@ -1123,41 +1225,26 @@ Compile all found information into a structured profile."""
         task.message = "Creating narrative structure..."
         task.progress = 20
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
-        
+
         if not self.genai_client:
             raise Exception("Gemini client not initialized")
-        
+
         # Get profile data from aggregate_history, enrich_profile, or fetch_profile tasks
         profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value)
         if not profile_data:
             profile_data = plan.result_data.get(TaskType.ENRICH_PROFILE.value)
         if not profile_data:
             profile_data = plan.result_data.get(TaskType.FETCH_PROFILE.value)
-        
-        # Ensure profile_data is a dict even if it was None in result_data
-        if profile_data is None:
-            profile_data = {}
-            
-        # Debug logging
-        logger.info(f"Structure journey task - Available result data keys: {list(plan.result_data.keys())}")
-        logger.info(f"Profile data type: {type(profile_data)}, keys: {list(profile_data.keys()) if isinstance(profile_data, dict) else 'Not a dict'}")
-        
-        # Validate profile data exists and has required structure
-        if not profile_data or not isinstance(profile_data, dict):
-            raise Exception(f"No valid profile data available for journey structuring. Available data keys: {list(plan.result_data.keys())}")
-        
-        # Check if profile has meaningful content
-        if not any(profile_data.get(key) for key in ['name', 'title', 'experiences', 'skills', 'bio']):
-            raise Exception("Profile data lacks sufficient content for journey structuring")
-        
-        prompt = get_journey_structuring_prompt(profile_data)
-        
+
         task.progress = 50
         task.message = "Generating journey chapters..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
+        prompt = get_journey_structuring_prompt(profile_data)
+
         # Try with thinking config first, fall back without if not supported
         try:
+            logger.info("Calling Gemini for journey structuring with thinking config...")
             response = await asyncio.to_thread(
                 self.genai_client.models.generate_content,
                 model="gemini-3-flash-preview",
@@ -1165,29 +1252,154 @@ Compile all found information into a structured profile."""
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=JOURNEY_STRUCTURE_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
+            logger.info(f"Gemini response received, length: {len(response.text) if response and response.text else 0}")
         except Exception as e:
-            if "thinking level" in str(e).lower():
+            logger.error(f"Journey structuring Gemini call failed with thinking config: {str(e)}")
+            if "thinking level" in str(e).lower() or "thinking" in str(e).lower():
                 logger.warning("Thinking config not supported, retrying without thinking config")
-                response = await asyncio.to_thread(
-                    self.genai_client.models.generate_content,
-                    model="gemini-3-flash-preview",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_json_schema=JOURNEY_STRUCTURE_SCHEMA
+                try:
+                    response = await asyncio.to_thread(
+                        self.genai_client.models.generate_content,
+                        model="gemini-3-flash-preview",
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_json_schema=JOURNEY_STRUCTURE_SCHEMA
+                        )
                     )
-                )
+                    logger.info(f"Gemini response received (retry), length: {len(response.text) if response and response.text else 0}")
+                except Exception as retry_error:
+                    logger.error(f"Journey structuring retry also failed: {str(retry_error)}")
+                    # Try with a different model as final fallback
+                    logger.info("Attempting final fallback with gemini-2.5-flash model...")
+                    try:
+                        response = await asyncio.to_thread(
+                            self.genai_client.models.generate_content,
+                            model="gemini-2.5-flash",
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json"
+                                # Note: Removed schema to be more lenient
+                            )
+                        )
+                        logger.info(f"Fallback model response received, length: {len(response.text) if response and response.text else 0}")
+                    except Exception as final_error:
+                        logger.error(f"All journey structuring attempts failed: {str(final_error)}")
+                        # Return detailed error structure instead of failing
+                        return {
+                            "summary": {
+                                "headline": profile_data.get('name', 'Professional') + " Journey",
+                                "narrative": "Unable to generate journey narrative - all AI models failed",
+                                "career_span": "Unknown",
+                                "key_themes": profile_data.get('skills', [])[:3] if profile_data.get('skills') else []
+                            },
+                            "milestones": [],
+                            "career_chapters": [],
+                            "skills_evolution": [],
+                            "impact_metrics": {},
+                            "error": f"All models failed: {str(final_error)}"
+                        }
             else:
-                raise
-        
+                logger.error(f"Non-thinking config related error: {str(e)}")
+                return {
+                    "summary": {
+                        "headline": profile_data.get('name', 'Professional') + " Journey",
+                        "narrative": "Unable to generate journey narrative due to processing error",
+                        "career_span": "Unknown", 
+                        "key_themes": profile_data.get('skills', [])[:3] if profile_data.get('skills') else []
+                    },
+                    "milestones": [],
+                    "career_chapters": [],
+                    "skills_evolution": [],
+                    "impact_metrics": {},
+                    "error": f"Processing error: {str(e)}"
+                }
+
         task.progress = 80
         task.message = "Finalising journey structure..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
-        
-        return self._parse_json_response(response.text)
+
+        # Enhanced JSON parsing with specific logging for journey
+        try:
+            if not response or not response.text:
+                logger.error("No response or empty response text from Gemini for journey structuring")
+                return {
+                    "summary": {
+                        "headline": profile_data.get('name', 'Professional') + " Journey",
+                        "narrative": "Empty response from AI processing",
+                        "career_span": "Unknown",
+                        "key_themes": []
+                    },
+                    "milestones": [],
+                    "career_chapters": [],
+                    "skills_evolution": [],
+                    "impact_metrics": {},
+                    "error": "Empty response from Gemini API"
+                }
+
+            logger.info(f"Parsing journey response: {response.text[:200]}...")
+            result = self._parse_json_response(response.text)
+
+            if not result:
+                logger.error("JSON parsing returned empty result for journey structuring")
+                return {
+                    "summary": {
+                        "headline": profile_data.get('name', 'Professional') + " Journey",
+                        "narrative": "Failed to parse AI response",
+                        "career_span": "Unknown",
+                        "key_themes": []
+                    },
+                    "milestones": [],
+                    "career_chapters": [],
+                    "skills_evolution": [],
+                    "impact_metrics": {},
+                    "error": "JSON parsing failed"
+                }
+
+            logger.info(f"Successfully processed journey data with keys: {list(result.keys())}")
+            
+            # Save journey data to database
+            from app.db.session import get_db
+            from app.models.user import ProfileHistory
+            
+            current_history_id = plan.options.get('history_id')
+            if current_history_id:
+                try:
+                    async for db in get_db():
+                        current_history = await db.get(ProfileHistory, current_history_id)
+                        if current_history:
+                            # Update structured_data with journey
+                            # Ensure we don't overwrite existing data (like raw profile data)
+                            updated_data = dict(current_history.structured_data or {})
+                            updated_data['journey'] = result
+                            current_history.structured_data = updated_data
+                            
+                            await db.commit()
+                            logger.info(f"Saved journey data to history record {current_history_id}")
+                        break
+                except Exception as db_error:
+                    logger.error(f"Failed to save journey data to DB: {db_error}")
+            
+            return result
+
+        except Exception as parse_error:
+            logger.error(f"Error processing journey response: {str(parse_error)}")
+            return {
+                "summary": {
+                    "headline": profile_data.get('name', 'Professional') + " Journey",
+                    "narrative": "Error processing AI response",
+                    "career_span": "Unknown",
+                    "key_themes": []
+                },
+                "milestones": [],
+                "career_chapters": [],
+                "skills_evolution": [],
+                "impact_metrics": {},
+                "error": f"Response processing error: {str(parse_error)}"
+            }
     
     async def _handle_generate_timeline(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle timeline generation task."""
@@ -1199,6 +1411,19 @@ Compile all found information into a structured profile."""
             raise Exception("Gemini client not initialized")
         
         journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
+        if not journey_data:
+            logger.warning("No journey data available for timeline generation, using profile data directly")
+            # Fallback to profile data for timeline generation
+            profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value) or plan.result_data.get(TaskType.ENRICH_PROFILE.value) or plan.result_data.get(TaskType.FETCH_PROFILE.value, {})
+            journey_data = {
+                "summary": {
+                    "headline": profile_data.get('name', 'Professional') + " Timeline",
+                    "narrative": profile_data.get('bio', ''),
+                    "key_themes": profile_data.get('skills', [])[:3] if profile_data.get('skills') else []
+                },
+                "milestones": profile_data.get('experiences', [])[:5] if profile_data.get('experiences') else []
+            }
+        
         prompt = get_timeline_generation_prompt(journey_data)
         
         task.progress = 60
@@ -1214,7 +1439,7 @@ Compile all found information into a structured profile."""
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=TIMELINE_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -1232,7 +1457,29 @@ Compile all found information into a structured profile."""
             else:
                 raise
         
-        return self._parse_json_response(response.text)
+        result = self._parse_json_response(response.text)
+        
+        # Save timeline data to database
+        from app.db.session import get_db
+        from app.models.user import ProfileHistory
+        
+        current_history_id = plan.options.get('history_id')
+        if current_history_id:
+            try:
+                async for db in get_db():
+                    current_history = await db.get(ProfileHistory, current_history_id)
+                    if current_history:
+                        updated_data = dict(current_history.structured_data or {})
+                        updated_data['timeline'] = result
+                        current_history.structured_data = updated_data
+                        
+                        await db.commit()
+                        logger.info(f"Saved timeline data to history record {current_history_id}")
+                    break
+            except Exception as db_error:
+                logger.error(f"Failed to save timeline data to DB: {db_error}")
+
+        return result
     
     async def _handle_generate_documentary(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle documentary narrative generation task."""
@@ -1244,7 +1491,30 @@ Compile all found information into a structured profile."""
             raise Exception("Gemini client not initialized")
         
         journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
-        profile_data = plan.result_data.get(TaskType.AGGREGATE_HISTORY.value, {})
+        profile_data = (
+            plan.result_data.get(TaskType.AGGREGATE_HISTORY.value) or 
+            plan.result_data.get(TaskType.ENRICH_PROFILE.value) or 
+            plan.result_data.get(TaskType.FETCH_PROFILE.value) or 
+            {}
+        )
+        
+        # Handle missing data gracefully
+        if not journey_data:
+            logger.warning("No journey data available for documentary, using profile data directly")
+            # Create minimal journey structure from profile data
+            base_profile = profile_data
+            journey_data = {
+                "summary": {
+                    "headline": base_profile.get('name', 'Professional') + " Story",
+                    "narrative": base_profile.get('bio', ''),
+                    "key_themes": base_profile.get('skills', [])[:3] if base_profile.get('skills') else []
+                },
+                "milestones": base_profile.get('experiences', [])[:3] if base_profile.get('experiences') else []
+            }
+            
+        if not profile_data:
+            logger.warning("No profile data available for documentary - all sources empty")
+        
         prompt = get_documentary_narrative_prompt(journey_data, profile_data)
         
         task.progress = 50
@@ -1260,7 +1530,7 @@ Compile all found information into a structured profile."""
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_json_schema=DOCUMENTARY_SCHEMA,
-                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                    # thinking_config=types.ThinkingConfig(thinking_level="low")
                 )
             )
         except Exception as e:
@@ -1282,7 +1552,29 @@ Compile all found information into a structured profile."""
         task.message = "Finalising documentary structure..."
         await self._broadcast_update(job_id, "task_progress", task.to_dict())
         
-        return self._parse_json_response(response.text)
+        result = self._parse_json_response(response.text)
+        
+        # Save documentary data to database
+        from app.db.session import get_db
+        from app.models.user import ProfileHistory
+        
+        current_history_id = plan.options.get('history_id')
+        if current_history_id:
+            try:
+                async for db in get_db():
+                    current_history = await db.get(ProfileHistory, current_history_id)
+                    if current_history:
+                        updated_data = dict(current_history.structured_data or {})
+                        updated_data['documentary'] = result
+                        current_history.structured_data = updated_data
+                        
+                        await db.commit()
+                        logger.info(f"Saved documentary data to history record {current_history_id}")
+                    break
+            except Exception as db_error:
+                logger.error(f"Failed to save documentary data to DB: {db_error}")
+
+        return result
     
     async def _handle_generate_video(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle video generation task using Veo 3.1."""
@@ -1306,42 +1598,124 @@ Compile all found information into a structured profile."""
         logger.warning(f"Unknown task type: {task.task_type}")
         return {"warning": "Unknown task type"}
     
-    def _create_aggregation_prompt(self, current_profile: Dict[str, Any], previous_profiles: List[Dict[str, Any]]) -> str:
-        """Create prompt for profile aggregation with Gemini 3."""
+    def _create_aggregation_prompt(
+        self, 
+        current_profile: Dict[str, Any], 
+        previous_profiles: List[Dict[str, Any]],
+        scraped_content: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
+        """Create prompt for profile aggregation with Gemini 3, including scraped content.
+        
+        New Flow: Combines profile data with rich scraped content from related links.
+        """
+        # Clean the current profile - remove internal fields not needed for aggregation
+        cleaned_profile = {
+            k: v for k, v in current_profile.items() 
+            if k not in ['scraped_content', 'enrichment_stats', 'github_data', 'enriched', 
+                        'enrichment_timestamp', 'history_checked', 'aggregated']
+            and v is not None
+        }
+        
+        # Prepare previous profiles section - only if we have meaningful data
+        previous_section = ""
+        if previous_profiles and len(previous_profiles) > 0:
+            # Filter to only include profiles with actual data
+            valid_previous = [
+                p for p in previous_profiles 
+                if p.get("data") and isinstance(p["data"], dict) and len(p["data"]) > 0
+            ]
+            if valid_previous:
+                previous_section = f"""
+**Previous Profile Records ({len(valid_previous)} records with data):**
+These are historical records from the same person's previous profile generations.
+Use them to identify career progression, new skills, and historical context.
+
+```json
+{json.dumps(valid_previous, indent=2, default=str)}
+```
+"""
+            else:
+                previous_section = "\n**Previous Profile Records:** None with usable data.\n"
+        else:
+            previous_section = "\n**Previous Profile Records:** This is the first profile record.\n"
+        
+        # Prepare scraped content section
+        scraped_section = ""
+        if scraped_content and len(scraped_content) > 0:
+            # Content is already filtered and sorted by quality score
+            valid_scrapes = [
+                s for s in scraped_content 
+                if s.get('content') or s.get('title')
+            ]
+            if valid_scrapes:
+                # Calculate quality stats
+                total_score = sum(s.get('quality_score', 5.0) for s in valid_scrapes)
+                avg_quality = total_score / len(valid_scrapes)
+                high_quality_count = sum(1 for s in valid_scrapes if s.get('quality_score', 5.0) >= 7.0)
+                
+                scraped_section = f"""
+**Enrichment Data from Web Scraping ({len(valid_scrapes)} sources, avg quality: {avg_quality:.1f}/10.0):**
+Content is sorted by quality score (highest first). {high_quality_count} sources have high quality scores (7.0+).
+Use this rich content to dramatically enhance the profile with verified achievements, media mentions, professional activities, etc.
+
+```json
+{json.dumps(valid_scrapes, indent=2, default=str)}
+```
+
+**How to Use Quality-Scored Scraped Content:**
+- PRIORITIZE higher quality_score sources (7.0+ are premium content)
+- Extract verified achievements, awards, and recognition from quality sources
+- Identify speaking engagements, publications, interviews, or media features
+- Capture precise dates and contexts from articles to build accurate timelines
+- Add professional insights, quotes, and thought leadership examples
+- Cross-reference multiple sources for accuracy validation
+- Use author/publisher information to assess credibility
+- Add professional recognition and community impact
+- Verify and cross-reference information with existing profile data
+"""
+        
         return f"""You are an expert at aggregating and enriching professional profile data.
 
 **Current Profile Data:**
 ```json
-{json.dumps(current_profile, indent=2)}
+{json.dumps(cleaned_profile, indent=2, default=str)}
 ```
-
-**Previous Profile Records ({len(previous_profiles)} records):**
-```json
-{json.dumps(previous_profiles, indent=2)}
-```
+{previous_section}
+{scraped_section}
 
 **Task:**
-Aggregate and merge all profile data to create the most comprehensive and accurate professional profile. Follow these guidelines:
+Aggregate and merge all profile data (including scraped enrichment content) to create the most comprehensive and accurate professional profile. Follow these guidelines:
 
 1. **Chronological Integration**: Merge experiences, projects, and achievements chronologically
-2. **Skill Evolution**: Track skill development and new technologies learned over time
-3. **Career Progression**: Identify career growth patterns and trajectory
-4. **Completeness**: Fill gaps using information from different records
-5. **Accuracy**: Prefer most recent data for current information, but preserve historical context
-6. **Deduplication**: Remove duplicate entries while preserving unique details
-7. **Enrichment**: Add insights about growth, patterns, and evolution
+2. **Scraped Content Integration**: Extract valuable information from scraped articles/pages:
+   - Speaking engagements or conference appearances
+   - Articles written by or featuring the person
+   - Project launches or product releases
+   - Awards, recognitions, or media mentions
+   - Professional insights and contributions
+3. **Skill Evolution**: Track skill development and new technologies learned over time
+4. **Career Progression**: Identify career growth patterns and trajectory
+5. **Digital Footprint**: Capture the person's professional presence across the web
+6. **Completeness**: Fill gaps using information from all sources
+7. **Accuracy**: Prefer most recent data for current information, but preserve historical context
+8. **Deduplication**: Remove duplicate entries while preserving unique details
+9. **Verification**: Cross-reference scraped content with profile data for accuracy
 
 **Output Requirements:**
 Return a JSON object with the aggregated profile containing:
+- name, title, location, bio (core identity fields)
 - All unique experiences (with date ranges)
 - Complete skills list (with evolution timeline if possible)
-- All projects and achievements
+- All projects and achievements (including those found in scraped content)
+- Publications, articles, or media mentions (from scraped content)
+- Speaking engagements or events (from scraped content)
 - Complete education history
-- Comprehensive contact information
+- Comprehensive contact information (email, website, linkedin, github, social_links)
+- Professional recognition and community impact
 - Career insights and patterns identified
-- Metadata about the aggregation (sources count, date range, etc.)
+- Metadata about the aggregation (sources count, scraped articles count, date range, etc.)
 
-Ensure the output is comprehensive, accurate, and provides a complete picture of the professional journey.
+Ensure the output is comprehensive, accurate, and provides a complete picture of the professional journey with rich digital footprint data.
 """
     
     def _parse_json_response(self, text: str) -> Dict[str, Any]:

@@ -164,6 +164,17 @@
   font-weight: 600;
 }
 
+.evolution-context {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid rgba(0, 212, 255, 0.3);
+  background: rgba(0, 212, 255, 0.05);
+  border-radius: 0 8px 8px 0;
+}
+
 /* Mobile Responsive */
 @media (max-width: 1024px) {
   .skills-layout {

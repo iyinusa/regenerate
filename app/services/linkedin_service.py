@@ -236,7 +236,8 @@ class LinkedInScrapingService:
                 "success": True,
                 "data": profile_data,
                 "fetched_at": datetime.utcnow().isoformat(),
-                "authenticated": True
+                "authenticated": True,
+                "linkedin_url": profile_data.get("basic_profile", {}).get("vanityName", None)  # Try to get profile URL
             }
             
         except Exception as e:

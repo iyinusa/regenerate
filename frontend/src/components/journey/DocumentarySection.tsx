@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import './DocumentarySection.css';
 
@@ -9,6 +10,17 @@ interface DocumentarySectionProps {
 
 const DocumentarySection: React.FC<DocumentarySectionProps> = ({ documentary, profile, sectionIndex }) => {
   const segments = documentary?.segments || [];
+  
+  // Debug logging to help troubleshoot
+  React.useEffect(() => {
+    console.log('Documentary data in DocumentarySection:', {
+      hasDocumentary: !!documentary,
+      title: documentary?.title,
+      tagline: documentary?.tagline,
+      segmentsLength: segments.length,
+      firstSegment: segments[0]
+    });
+  }, [documentary, segments]);
 
   return (
     <section className="journey-section documentary-section" data-section={sectionIndex}>

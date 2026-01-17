@@ -116,7 +116,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
       const xPos = (clientX / window.innerWidth - 0.5) * 20;
       const yPos = (clientY / window.innerHeight - 0.5) * 20;
       
-      gsap.to(".hero-title", {
+      gsap.to(".mhero-title", {
         x: xPos,
         y: yPos,
         duration: 1,
@@ -200,12 +200,12 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
             </div>
           </div>
 
-          <h1 ref={titleRef} className="hero-title">
+          <h1 ref={titleRef} className="mhero-title">
             REGENERATE <br />
             <span className="gradient-text">YOUR JOURNEY</span>
           </h1>
           
-          <p ref={subtitleRef} className="hero-subtitle">
+          <p ref={subtitleRef} className="mhero-subtitle">
             Traditional resumes are fading. We are using the <span className="highlight">Smartest AI</span> to distill your entire professional footprint into an immersive cinematic experience. Your work deserves to be celebrated.
           </p>
 

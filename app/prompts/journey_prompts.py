@@ -22,7 +22,8 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
                     "items": {"type": "string"},
                     "description": "3-5 key themes of the career"
                 }
-            }
+            },
+            "required": ["headline", "narrative", "career_span", "key_themes"]
         },
         "milestones": {
             "type": "array",
@@ -41,7 +42,8 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
                         "enum": ["major", "moderate", "minor"]
                     },
                     "impact_statement": {"type": "string"}
-                }
+                },
+                "required": ["date", "title", "description", "category"]
             }
         },
         "career_chapters": {
@@ -51,12 +53,9 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
                 "properties": {
                     "title": {"type": "string", "description": "Chapter title e.g., 'The Foundation Years'"},
                     "period": {"type": "string"},
-                    "narrative": {"type": "string"},
-                    "key_learnings": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                }
+                    "narrative": {"type": "string"}
+                },
+                "required": ["title", "period", "narrative"]
             }
         },
         "skills_evolution": {
@@ -64,10 +63,18 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "skill": {"type": "string"},
-                    "acquired_date": {"type": "string"},
-                    "proficiency_growth": {"type": "string"}
-                }
+                    "period": {"type": "string", "description": "Time period (e.g., '2015-2017', 'Early Career')"},
+                    "stage": {"type": "string", "description": "Career stage name"},
+                    "milestone": {"type": "string", "description": "Key milestone achieved"},
+                    "year": {"type": "string", "description": "Alternative to period for single year"},
+                    "description": {"type": "string", "description": "What was learned/achieved"},
+                    "skills_acquired": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Specific skills gained during this period"
+                    }
+                },
+                "required": ["period", "stage", "description", "skills_acquired"]
             }
         },
         "impact_metrics": {
@@ -76,11 +83,11 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
                 "years_experience": {"type": "number"},
                 "companies_count": {"type": "number"},
                 "projects_count": {"type": "number"},
-                "skills_count": {"type": "number"},
-                "achievements_count": {"type": "number"}
+                "skills_count": {"type": "number"}
             }
         }
-    }
+    },
+    "required": ["summary", "milestones", "career_chapters", "skills_evolution", "impact_metrics"]
 }
 
 
@@ -206,8 +213,40 @@ Create a structured journey that:
 - summary: Headline, narrative, career span, key themes
 - milestones: Chronologically ordered significant events
 - career_chapters: 3-5 distinct career phases with narratives
-- skills_evolution: How skills were acquired over time
+- skills_evolution: CRITICAL - Detailed progression showing skills acquired over time with periods, stages, milestones, descriptions, and context
 - impact_metrics: Quantified career statistics
+
+**CRITICAL: Skills Evolution Structure**
+The skills_evolution array MUST capture the complete skill development journey:
+- Each entry should represent a distinct period/stage in skill development
+- Include specific skills acquired during that period
+- Provide context for why skills were developed (job requirements, projects, interests)
+- Show progression from beginner to expert levels
+- Connect skills to career milestones and projects
+
+Example structure:
+```json
+"skills_evolution": [
+  {{
+    "period": "2015-2017",
+    "stage": "Foundation Years",
+    "milestone": "Starting Programming Career", 
+    "description": "Built fundamental programming skills through education and first projects",
+    "skills_acquired": ["Python", "JavaScript", "HTML/CSS", "Git"],
+    "skill_level": "Beginner to Intermediate",
+    "context": "University coursework and first internships"
+  }},
+  {{
+    "period": "2018-2020", 
+    "stage": "Professional Growth",
+    "milestone": "First Full-Stack Developer Role",
+    "description": "Expanded to full-stack development and learned modern frameworks",
+    "skills_acquired": ["React", "Node.js", "MongoDB", "AWS"],
+    "skill_level": "Intermediate to Advanced",
+    "context": "Industry demands and project requirements"
+  }}
+]
+```
 
 Return a JSON object following the journey structure schema."""
 
