@@ -41,7 +41,31 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    const bgColor = theme === 'day' ? 0x0a1628 : 0x050510;
+    // Helper to create circular space particle texture
+    const createParticleTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const context = canvas.getContext('2d');
+      if (!context) return null;
+
+      const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      context.clearRect(0, 0, 32, 32);
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, 32, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    };
+
+    const particleTexture = createParticleTexture();
+
+    const bgColor = theme === 'day' ? 0x2b4c7e : 0x030308;
     scene.fog = new THREE.FogExp2(bgColor, 0.008);
 
     // Camera setup
@@ -70,7 +94,7 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     // Create main particle system
     const createParticles = () => {
       const geometry = new THREE.BufferGeometry();
-      const count = 6000;
+      const count = 3000;
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
 
@@ -100,7 +124,9 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
       const material = new THREE.PointsMaterial({
-        size: 1.2,
+        size: 1.5,
+        map: particleTexture,
+        depthWrite: false,
         vertexColors: true,
         transparent: true,
         opacity: 0.8,
@@ -116,7 +142,7 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
     // Create atmospheric dust particles
     const createAtmosphericParticles = () => {
       const geometry = new THREE.BufferGeometry();
-      const count = 2000;
+      const count = 500;
       const positions = new Float32Array(count * 3);
       const colors = new Float32Array(count * 3);
 
@@ -136,7 +162,9 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
       const material = new THREE.PointsMaterial({
-        size: 2,
+        size: 2.5,
+        map: particleTexture,
+        depthWrite: false,
         vertexColors: true,
         transparent: true,
         opacity: 0.4,
@@ -253,10 +281,17 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       }
 
       // Animate shapes
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollFraction = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+      const targetScale = 1 + scrollFraction * 2.0;
+
       shapesRef.current.forEach((shape, i) => {
         shape.position.y += Math.sin(time + i) * 0.02;
         const material = shape.material as THREE.MeshBasicMaterial;
         material.opacity = 0.3 + Math.sin(time * 2 + i) * 0.15;
+        
+        // Scale effect based on scroll
+        shape.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.05);
       });
 
       // Camera parallax
@@ -282,6 +317,7 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
       }
       
       renderer.dispose();
+      particleTexture?.dispose();
       
       // Dispose geometries and materials
       scene.traverse((child) => {

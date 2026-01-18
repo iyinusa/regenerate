@@ -227,6 +227,7 @@ You MUST also extract a comprehensive list of related links:
 - Include publication dates in descriptions when visible
 - Focus on recent content (last 3-5 years) but include significant older achievements
 - Target 10-20 high-quality specific links rather than 5 general ones
+- Links MUST be accessible and publicly available.
 
 **CRITICAL DATA INTEGRITY RULES:**
 1. **IDENTITY ANCHOR:** The person is defined ONLY by the URL: {url}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { Timeline, DataSet } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.min.css';
 import './TimelineSection.css';
@@ -16,6 +16,8 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
   const carouselRef = useRef<HTMLDivElement>(null);
   const spinContainerRef = useRef<HTMLDivElement>(null);
   const [isCarouselReady, setIsCarouselReady] = useState(false);
+
+  const { scrollY } = useScroll();
 
   useEffect(() => {
     if (!timelineRef.current || !timeline?.events) return;
@@ -191,6 +193,11 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
   const milestones = journey?.milestones || [];
   const eras = timeline?.eras || [];
 
+  // Parallax and fade effects on scroll
+  const opacity = useTransform(scrollY, [0, 950], [0.5, 1]);
+  const scale = useTransform(scrollY, [0, 950], [0.5, 1]);
+  const y = useTransform(scrollY, [0, 950], [100, 0]);
+
   return (
     <section className="journey-section timeline-section" data-section={sectionIndex}>
       <div className="section-container">
@@ -198,7 +205,8 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.8 }} 
+          style={{ opacity, scale, y }}
         >
           <h2 className="section-title gradient-text">The Journey</h2>
           <p className="section-subtitle">A chronological exploration of milestones and achievements</p>
@@ -211,7 +219,8 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            transition={{ duration: 0.8, delay: 0.2 }} 
+            style={{ opacity, scale, y }}
           >
             {eras.map((era: any, index: number) => (
               <motion.div
@@ -244,7 +253,8 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.4 }}
+          transition={{ duration: 0.8, delay: 0.4 }} 
+          style={{ opacity, scale, y }}
         >
           <div ref={timelineRef} className="vis-timeline-wrapper"></div>
         </motion.div>
@@ -256,7 +266,8 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey, se
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.6 }}
+            transition={{ duration: 0.8, delay: 0.6 }} 
+            style={{ opacity, scale, y }}
           >
             <h3 className="milestones-title gradient-text">Key Milestones</h3>
             <p className="carousel-subtitle">Drag to explore • Scroll to zoom</p>

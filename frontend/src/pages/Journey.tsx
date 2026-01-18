@@ -189,6 +189,7 @@ const Journey: React.FC = () => {
         <HeroSection 
           profile={profile} 
           documentary={documentary}
+          journey={journey}
           sectionIndex={0}
         />
 
