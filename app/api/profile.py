@@ -1,7 +1,8 @@
 """Profile API routes."""
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
@@ -321,4 +322,241 @@ async def get_journey_by_guest_id(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get journey data: {str(e)}"
+        )
+
+
+@router.put(
+    "/timeline/{history_id}",
+    summary="Update Timeline Events",
+    description="Update timeline events data for a specific profile history."
+)
+async def update_timeline_events(
+    history_id: str,
+    timeline_events: List[Dict[str, Any]],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update timeline events for a specific profile history.
+    
+    This endpoint allows updating the timeline.events section of the structured_data,
+    enabling inline editing of the Chronicles section.
+    
+    Args:
+        history_id: The profile history identifier
+        timeline_events: Updated list of timeline events
+        db: Database session
+        
+    Returns:
+        Updated timeline data
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Updating timeline events for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Update timeline events while preserving other timeline data
+        if 'timeline' not in structured_data:
+            structured_data['timeline'] = {}
+        
+        structured_data['timeline']['events'] = timeline_events
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data - ensure proper JSON serialization
+        from sqlalchemy.orm.attributes import flag_modified
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')  # Mark JSON field as modified
+        await db.commit()
+        await db.refresh(history)
+        
+        logger.info(f"Successfully updated timeline events for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Timeline events updated successfully",
+            "timeline": structured_data.get('timeline', {}),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update timeline events for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update timeline events: {str(e)}"
+        )
+
+
+@router.post(
+    "/timeline/{history_id}/events",
+    summary="Add Timeline Event",
+    description="Add a new event to the timeline."
+)
+async def add_timeline_event(
+    history_id: str,
+    event_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Add a new timeline event.
+    
+    Args:
+        history_id: The profile history identifier
+        event_data: New event data to add
+        db: Database session
+        
+    Returns:
+        Success response with updated timeline
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        import uuid
+        
+        logger.info(f"Adding new timeline event for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Ensure timeline and events exist
+        if 'timeline' not in structured_data:
+            structured_data['timeline'] = {}
+        if 'events' not in structured_data['timeline']:
+            structured_data['timeline']['events'] = []
+        
+        # Add unique ID if not provided
+        if 'id' not in event_data:
+            event_data['id'] = str(uuid.uuid4())
+        
+        # Add the new event
+        structured_data['timeline']['events'].append(event_data)
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully added timeline event for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Timeline event added successfully",
+            "event": event_data,
+            "timeline": structured_data.get('timeline', {}),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to add timeline event for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add timeline event: {str(e)}"
+        )
+
+
+@router.delete(
+    "/timeline/{history_id}/events/{event_id}",
+    summary="Delete Timeline Event",
+    description="Delete a specific timeline event."
+)
+async def delete_timeline_event(
+    history_id: str,
+    event_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Delete a timeline event.
+    
+    Args:
+        history_id: The profile history identifier
+        event_id: The event identifier to delete
+        db: Database session
+        
+    Returns:
+        Success response with updated timeline
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Deleting timeline event {event_id} for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data
+        structured_data = history.structured_data or {}
+        
+        if 'timeline' not in structured_data or 'events' not in structured_data['timeline']:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Timeline events not found"
+            )
+        
+        # Find and remove the event
+        events = structured_data['timeline']['events']
+        original_count = len(events)
+        structured_data['timeline']['events'] = [e for e in events if e.get('id') != event_id]
+        
+        if len(structured_data['timeline']['events']) == original_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Timeline event not found: {event_id}"
+            )
+        
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully deleted timeline event {event_id} for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Timeline event deleted successfully",
+            "timeline": structured_data.get('timeline', {}),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete timeline event {event_id} for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete timeline event: {str(e)}"
         )

@@ -3,15 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { gsap } from 'gsap';
+import SectionDataEditor from './SectionDataEditor';
+import { chroniclesConfig } from './sectionEditorConfig';
 import './TimelineSection.css';
 
 interface TimelineSectionProps {
   timeline: any;
   journey: any;
   sectionIndex: number;
+  historyId?: string; // For editing functionality
 }
 
-const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _journey, sectionIndex: _sectionIndex }) => {
+const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _journey, sectionIndex: _sectionIndex, historyId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -21,11 +24,37 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
   const markersRef = useRef<THREE.Mesh[]>([]);
   const controlsRef = useRef<OrbitControls | null>(null);
   const [activeEvent, setActiveEvent] = useState<any | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [timelineEvents, setTimelineEvents] = useState(timeline?.events || []);
   
-  // Data processing
+  // Data processing - Sort events chronologically (oldest to newest)
+  // so they appear from bottom to top on the spiral
   const events = useMemo(() => {
-    return timeline?.events?.map((e: any, i: number) => ({ ...e, originalIndex: i })) || [];
+    const eventsWithIndex = timelineEvents?.map((e: any, i: number) => ({ ...e, originalIndex: i })) || [];
+    // Sort by date (start_date or date field)
+    return eventsWithIndex.sort((a: any, b: any) => {
+      const dateA = new Date(a.start_date || a.date).getTime();
+      const dateB = new Date(b.start_date || b.date).getTime();
+      return dateA - dateB; // Ascending order (oldest first)
+    });
+  }, [timelineEvents]);
+
+  // Update local events when timeline prop changes
+  useEffect(() => {
+    setTimelineEvents(timeline?.events || []);
   }, [timeline]);
+
+  // Handler for events update from modal
+  const handleEventsUpdate = (updatedEvents: any[]) => {
+    setTimelineEvents(updatedEvents);
+    setActiveEvent(null); // Close any open event popup
+  };
+
+  // Handler to open edit modal
+  const handleOpenEditModal = () => {
+    setIsEditModalOpen(true);
+    setActiveEvent(null); // Close any open event popup
+  };
 
   useEffect(() => {
     if (!containerRef.current || events.length === 0) return;
@@ -138,24 +167,79 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
     // --- Place Event Markers & Labels ---
     markersRef.current = [];
     
+    // Icon name to emoji mapper
+    const iconMap: { [key: string]: string } = {
+      'briefcase': '💼',
+      'graduation-cap': '🎓',
+      'trophy': '🏆',
+      'code': '💻',
+      'certificate': '📜',
+      'star': '⭐',
+      'rocket': '🚀',
+      'book': '📚',
+      'lightbulb': '💡',
+      'heart': '❤️',
+      'flag': '🚩',
+      'target': '🎯',
+      'medal': '🏅',
+      'crown': '👑',
+      'fire': '🔥'
+    };
+    
+    // Date formatter helper
+    const formatEventDate = (event: any): string => {
+        const date = new Date(event.start_date || event.date);
+        const year = date.getFullYear();
+        
+        // Get icon - check if it's already an emoji or needs mapping
+        let iconStr = '';
+        if (event.icon) {
+          // If it's already an emoji (single character or emoji), use it
+          if (event.icon.length <= 2 || /\p{Emoji}/u.test(event.icon)) {
+            iconStr = event.icon;
+          } else {
+            // Try to map the icon name to emoji
+            iconStr = iconMap[event.icon] || iconMap[event.icon.toLowerCase()] || '';
+          }
+        }
+        
+        // Check if we have a valid month (not just a year)
+        const hasMonth = date.getMonth() !== 0 || date.getDate() !== 1 || 
+                        (event.start_date || event.date).includes('-');
+        
+        if (hasMonth) {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = monthNames[date.getMonth()];
+            const dateStr = `${month} ${year}`;
+            
+            // Add icon if available
+            return iconStr ? `${iconStr} ${dateStr}` : dateStr;
+        } else {
+            // Only year available
+            return iconStr ? `${iconStr} ${year}` : `${year}`;
+        }
+    };
+    
     // Label Helper
     const createLabel = (text: string) => {
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
-        canvas.width = 256;
+        canvas.width = 512;
         canvas.height = 128;
         if(context) {
             context.fillStyle = 'rgba(0,0,0,0)'; // Transparent
-            context.fillRect(0, 0, 256, 128);
-            context.font = 'Bold 48px Arial';
+            context.fillRect(0, 0, 512, 128);
+            // Use system fonts with emoji support
+            context.font = 'Bold 40px -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", Arial, sans-serif';
             context.fillStyle = '#efefef';
             context.textAlign = 'center';
-            context.fillText(text, 128, 80);
+            context.fillText(text, 256, 80);
         }
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(5, 2.5, 1);
+        sprite.scale.set(8, 2, 1);
         return sprite;
     };
 
@@ -165,7 +249,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
         
         // Marker
         const markerGeo = new THREE.SphereGeometry(0.5, 16, 16);
-        const markerMat = new THREE.MeshBasicMaterial({ color: 0x0066ff });
+        const markerMat = new THREE.MeshBasicMaterial({ color: 0x999999 });
         const marker = new THREE.Mesh(markerGeo, markerMat);
         
         marker.position.copy(point);
@@ -177,14 +261,14 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
 
         // Glow
         const ringGeo = new THREE.RingGeometry(0.6, 0.8, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.position.copy(point);
         ring.lookAt(point.clone().multiplyScalar(2));
         timelineGroup.add(ring);
 
-        // Label (Year/Date)
-        const dateStr = new Date(event.start_date || event.date).getFullYear().toString();
+        // Label (Icon + Month Year or just Year)
+        const dateStr = formatEventDate(event);
         const label = createLabel(dateStr);
         // Position label slightly "out" from the marker
         const labelPos = point.clone().normalize().multiplyScalar(radius + 2);
@@ -307,7 +391,43 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
       
       {/* Title Overlay */}
       <div className="timeline-title-overlay" style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center', width: '90%' }}>
-        <h2 className="section-title gradient-text" style={{ fontSize: '2.5rem', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Chronicles</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', pointerEvents: 'auto' }}>
+          <h2 className="section-title gradient-text" style={{ fontSize: '2.5rem', textShadow: '0 2px 10px rgba(0,0,0,0.5)', margin: 0 }}>
+            Chronicles
+          </h2>
+          {historyId && (
+            <button
+              onClick={handleOpenEditModal}
+              className="edit-section-btn"
+              title="Edit Chronicles"
+              style={{
+                background: 'rgba(0, 212, 255, 0.15)',
+                border: '1px solid rgba(0, 212, 255, 0.3)',
+                borderRadius: '8px',
+                padding: '8px',
+                cursor: 'pointer',
+                color: '#00d4ff',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 212, 255, 0.25)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 212, 255, 0.15)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m18 2 4 4-5.5 5.5-4-4L18 2z"></path>
+                <path d="M11.5 6.5 6 12v4h4l5.5-5.5"></path>
+              </svg>
+            </button>
+          )}
+        </div>
         <p className="section-subtitle" style={{ fontSize: '1rem', opacity: 0.8, marginBottom: '3rem' }}>Drag to explore • Tap nodes for details</p>
       </div>
 
@@ -361,6 +481,16 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Section Data Editor - Generic modal for Chronicles/Timeline editing */}
+      <SectionDataEditor
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        config={chroniclesConfig}
+        items={timelineEvents}
+        historyId={historyId || ''}
+        onItemsUpdate={handleEventsUpdate}
+      />
     </section>
   );
 };

@@ -60,6 +60,7 @@ const Journey: React.FC = () => {
   const [journey, setJourney] = useState<JourneyData | null>(null);
   const [timeline, setTimeline] = useState<TimelineData | null>(null);
   const [documentary, setDocumentary] = useState<DocumentaryData | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(0);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,7 @@ const Journey: React.FC = () => {
           setJourney(response.journey || null);
           setTimeline(response.timeline || null);
           setDocumentary(response.documentary || null);
+          setHistoryId(response.history_id || null); // Capture history ID for editing
           setLoading(false);
         } else if (jobId) {
           // Traditional format: /journey?jobId={job_id}
@@ -199,6 +201,7 @@ const Journey: React.FC = () => {
             timeline={timeline}
             journey={journey}
             sectionIndex={1}
+            historyId={historyId || undefined}
           />
         )}
 
