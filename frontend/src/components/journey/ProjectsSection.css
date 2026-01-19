@@ -150,368 +150,232 @@
   transform: translateX(3px);
 }
 
-/* Achievements */
-.achievements-section {
+/* Achievements Section - 3D Carousel */
+.achievements-3d-section {
   margin-top: 5rem;
-  /* Isolate from global cinematic effects */
+  min-height: 750px;
+  /* perspective: 1200px; */
+  overflow: visible;
   position: relative;
   z-index: 10;
+  padding: 2rem 0 4rem 0;
 }
 
 .achievements-title {
-  font-size: 2rem;
+  font-size: 2.5rem;
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
-.achievements-carousel {
+.carousel-subtitle {
+  text-align: center;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 3rem;
+  font-style: italic;
+}
+
+.carousel-3d-container {
   position: relative;
-  height: 700px;
   display: flex;
   justify-content: center;
   align-items: center;
-  perspective: 1800px;
-  perspective-origin: center center;
+  height: 320px;
+  /* perspective: 1200px; */
+  transform-style: preserve-3d;
+  padding: 50px 0 150px 0;
   overflow: visible;
-  margin: 3rem 0;
-  user-select: none;
-  /* Reset any inherited transforms */
-  transform: none;
-  /* Ensure proper 3D context */
-  transform-style: preserve-3d;
-  /* Add subtle gradient background for depth */
-  background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.05) 0%, transparent 70%);
-  /* Cursor indicates draggable */
-  cursor: grab;
 }
 
-.achievements-carousel:active {
-  cursor: grabbing;
-}
-
-.achievements-carousel-container {
+.drag-container {
   position: relative;
-  width: 100%;
-  height: 500px;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  margin: auto;
   transform-style: preserve-3d;
-  /* Ensure 3D transforms work properly */
-  perspective: inherit;
-  perspective-origin: inherit;
-  overflow: visible !important;
-  /* Subtle downward tilt for better 3D perspective */
-  transform: rotateX(-8deg);
+  transform: rotateX(-10deg);
+  transition: transform 0.3s ease;
+  user-select: none;
 }
 
+.drag-container:active {
+  cursor: grabbing !important;
+}
+
+.spin-container {
+  position: relative;
+  width: 250px;
+  height: 320px;
+  transform-style: preserve-3d;
+  transform: scale(var(--scale, 1));
+  transition: transform 0.3s ease;
+}
+
+/* Achievement Carousel Cards */
 .achievement-carousel-card {
-  position: absolute;
-  width: 320px !important;
-  min-width: 320px !important;
-  max-width: 320px !important;
-  height: 420px !important;
-  min-height: 420px !important;
-  max-height: 420px !important;
-  background: linear-gradient(145deg, 
-    rgba(15, 15, 40, 0.95), 
-    rgba(25, 25, 60, 0.9),
-    rgba(35, 35, 80, 0.85)
-  ) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 20px !important;
-  padding: 2rem;
+  transform-style: preserve-3d;
+  position: absolute !important;
+  left: 0;
+  top: 0;
+  width: 250px;
+  height: 320px;
+  padding: 1.5rem;
+  text-align: center;
+  border-radius: 15px;
+  box-shadow: 0 8px 32px rgba(0, 212, 255, 0.2);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    135deg,
+    rgba(0, 212, 255, 0.5) 0%,
+    rgba(123, 47, 247, 0.5) 100%
+  );
+  
+  /* Mirror reflection effect */
+  -webkit-box-reflect: below 15px linear-gradient(
+    transparent,
+    transparent,
+    rgba(255, 255, 255, 0.05)
+  );
+  
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  transform-style: preserve-3d;
-  cursor: pointer;
-  transition: all 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
-  /* Enhanced backdrop filter for depth */
-  backdrop-filter: blur(15px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(15px) saturate(1.2) !important;
-  /* Ensure proper layering */
-  will-change: transform;
-  /* Transform origin at center for proper rotation */
-  transform-origin: center center;
-  backface-visibility: hidden;
-  /* Prevent atmospheric effects from affecting cards */
-  isolation: isolate;
-  /* Enhanced shadow for depth */
-  box-shadow: 
-    0 15px 45px rgba(0, 0, 0, 0.4),
-    0 8px 20px rgba(0, 0, 0, 0.2),
-    inset 0 1px 20px rgba(255, 255, 255, 0.1) !important;
-  /* CRITICAL: Allow overflow for 3D effect */
-  overflow: visible !important;
 }
 
-/* Enhanced reflection for cylindrical carousel */
-.achievement-carousel-card::after {
-  content: '';
+.achievement-carousel-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 212, 255, 0.4);
+  transform: translateZ(20px) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 212, 255, 0.3) 0%,
+    rgba(123, 47, 247, 0.3) 100%
+  );
+  
+  /* Enhanced reflection on hover */
+  -webkit-box-reflect: below 15px linear-gradient(
+    transparent,
+    transparent,
+    rgba(255, 255, 255, 0.1)
+  );
+}
+
+/* Ground reflection */
+.carousel-ground {
+  width: 600px;
+  height: 600px;
   position: absolute;
   top: 100%;
   left: 50%;
-  width: 80%;
-  height: 60%;
-  background: linear-gradient(145deg, 
-    rgba(15, 15, 40, 0.4), 
-    rgba(25, 25, 60, 0.3),
-    rgba(35, 35, 80, 0.25)
+  transform: translate(-50%, -50%) rotateX(90deg);
+  background: radial-gradient(
+    rgba(0, 212, 255, 0.15),
+    transparent 70%
   );
-  border-radius: 20px;
-  transform: translateX(-50%) scaleY(-0.4) translateY(20px) rotateX(75deg);
-  opacity: 0.3;
-  mask: linear-gradient(to bottom, 
-    rgba(0,0,0,0.6) 0%, 
-    rgba(0,0,0,0.3) 50%, 
-    rgba(0,0,0,0) 100%
-  );
-  -webkit-mask: linear-gradient(to bottom, 
-    rgba(0,0,0,0.6) 0%, 
-    rgba(0,0,0,0.3) 50%, 
-    rgba(0,0,0,0) 100%
-  );
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* Center title */
+.carousel-center-title {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotateX(90deg);
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 1.5rem;
+  font-weight: 300;
+  text-align: center;
   pointer-events: none;
   z-index: -1;
-  transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.achievement-carousel-card.active-achievement-card {
-  background: linear-gradient(145deg, 
-    rgba(0, 212, 255, 0.18), 
-    rgba(123, 47, 247, 0.15),
-    rgba(255, 170, 0, 0.08)
-  ) !important;
-  box-shadow: 
-    0 0 80px rgba(0, 212, 255, 0.7),
-    0 0 120px rgba(0, 212, 255, 0.4),
-    0 25px 80px rgba(0, 0, 0, 0.6),
-    inset 0 0 50px rgba(0, 212, 255, 0.15),
-    inset 0 2px 40px rgba(255, 255, 255, 0.2) !important;
-  border: 2px solid rgba(0, 212, 255, 0.95) !important;
-  transform: scale(1.05) translateZ(50px) !important;
-  /* Enhanced glow for active state */
-  filter: brightness(1.3) saturate(1.4) !important;
-  /* Ensure this card stays on top */
-  z-index: 1000 !important;
-  /* Animate the glow */
-  animation: activeCardPulse 4s ease-in-out infinite alternate;
-}
-
-@keyframes activeCardPulse {
-  0% {
-    box-shadow: 
-      0 0 80px rgba(0, 212, 255, 0.7),
-      0 0 120px rgba(0, 212, 255, 0.4),
-      0 25px 80px rgba(0, 0, 0, 0.6),
-      inset 0 0 50px rgba(0, 212, 255, 0.15);
-  }
-  100% {
-    box-shadow: 
-      0 0 100px rgba(0, 212, 255, 0.9),
-      0 0 150px rgba(0, 212, 255, 0.5),
-      0 30px 90px rgba(0, 0, 0, 0.6),
-      inset 0 0 60px rgba(0, 212, 255, 0.25);
-  }
-}
-
-.achievement-carousel-card.active-achievement-card::after {
-  box-shadow: 
-    0 0 40px rgba(0, 212, 255, 0.5),
-    0 0 60px rgba(0, 212, 255, 0.3);
-  opacity: 0.5;
-  transform: translateX(-50%) scaleY(-0.5) translateY(15px) rotateX(75deg);
-}
-
-.achievement-icon {
-  width: 80px;
-  height: 80px;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.25), 
-    rgba(123, 47, 247, 0.25),
-    rgba(255, 170, 0, 0.15)
-  );
+/* Achievement card content */
+.achievement-carousel-card .achievement-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(123, 47, 247, 0.3));
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffaa00;
-  box-shadow: 
-    0 6px 20px rgba(0,0,0,0.3),
-    inset 0 2px 10px rgba(255, 255, 255, 0.1);
-  transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  /* Add subtle animation */
-  animation: iconFloat 4s ease-in-out infinite;
+  color: #00d4ff;
+  flex-shrink: 0;
 }
 
-@keyframes iconFloat {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  25% { transform: translateY(-3px) rotate(1deg); }
-  50% { transform: translateY(-5px) rotate(0deg); }
-  75% { transform: translateY(-3px) rotate(-1deg); }
-}
-
-.achievement-carousel-card.active-achievement-card .achievement-icon {
-  box-shadow: 
-    0 0 25px rgba(0, 212, 255, 0.6),
-    0 0 40px rgba(0, 212, 255, 0.3),
-    0 8px 25px rgba(0,0,0,0.4),
-    inset 0 2px 15px rgba(255, 255, 255, 0.2);
-  color: #ffd700;
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.4), 
-    rgba(123, 47, 247, 0.35),
-    rgba(255, 215, 0, 0.2)
-  );
-  transform: scale(1.1);
-  animation: activeIconPulse 2s ease-in-out infinite;
-}
-
-@keyframes activeIconPulse {
-  0%, 100% { 
-    transform: scale(1.1) translateY(0px);
-    box-shadow: 
-      0 0 25px rgba(0, 212, 255, 0.6),
-      0 0 40px rgba(0, 212, 255, 0.3),
-      0 8px 25px rgba(0,0,0,0.4);
-  }
-  50% { 
-    transform: scale(1.15) translateY(-2px);
-    box-shadow: 
-      0 0 35px rgba(0, 212, 255, 0.8),
-      0 0 60px rgba(0, 212, 255, 0.4),
-      0 12px 30px rgba(0,0,0,0.5);
-  }
-}
-
-.achievement-title {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 1rem;
-  text-shadow: 
-    0 2px 4px rgba(0,0,0,0.6),
-    0 0 20px rgba(0, 212, 255, 0.3);
-  line-height: 1.3;
-  transition: all 0.3s ease;
-}
-
-.achievement-description {
-  font-size: 0.95rem;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.85);
-  margin-bottom: 1rem;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  max-width: 90%;
-  transition: all 0.3s ease;
-}
-
-.achievement-date {
-  margin-top: auto;
-  font-size: 0.85rem;
+.achievement-carousel-card .achievement-date {
+  font-size: 0.8rem;
   color: #00d4ff;
   font-weight: 600;
-  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
   text-transform: uppercase;
-  padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.15), 
-    rgba(123, 47, 247, 0.1)
-  );
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  border-radius: 25px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  letter-spacing: 0.1em;
 }
 
-.achievements-carousel-controls {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  display: flex;
-  justify-content: space-between;
-  padding: 0 3%;
-  pointer-events: none;
-  z-index: 200;
-  /* Isolate from background effects */
-  isolation: isolate;
+.achievement-carousel-card .achievement-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #fff;
+  line-height: 1.2;
 }
 
-.achievements-carousel-btn {
-  pointer-events: auto;
-  width: 55px;
-  height: 55px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.1), 
-    rgba(0, 212, 255, 0.05)
-  );
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  backdrop-filter: blur(10px);
-  box-shadow: 
-    0 4px 15px rgba(0, 0, 0, 0.2),
-    inset 0 1px 10px rgba(255, 255, 255, 0.1);
-  /* Add subtle animation */
-  animation: controlFloat 6s ease-in-out infinite;
-}
-
-@keyframes controlFloat {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-2px); }
-}
-
-.achievements-carousel-btn:hover {
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.25), 
-    rgba(123, 47, 247, 0.15)
-  );
-  border-color: rgba(0, 212, 255, 0.6);
-  color: #00d4ff;
-  transform: scale(1.15) translateY(-2px);
-  box-shadow: 
-    0 0 20px rgba(0, 212, 255, 0.4),
-    0 6px 20px rgba(0, 0, 0, 0.3),
-    inset 0 1px 15px rgba(255, 255, 255, 0.2);
-  animation: none;
-}
-
-.achievements-carousel-btn:active {
-  transform: scale(1.05) translateY(0px);
-}
-
-.achievements-carousel-scroll-hint {
-  position: absolute;
-  bottom: -50px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.9rem;
-  text-align: center;
-  animation: fadeInOut 2s infinite;
-}
-
-@keyframes fadeInOut {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
-}
-
-.achievement-date {
+.achievement-carousel-card .achievement-description {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-style: italic;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+@keyframes spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes spinRevert {
+  from { transform: rotateY(360deg); }
+  to { transform: rotateY(0deg); }
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 768px) {
+  .achievements-3d-section {
+    min-height: 600px;
+    padding: 1rem 1rem 3rem 1rem;
+  }
+  
+  .carousel-3d-container {
+    height: 500px;
+    perspective: 900px;
+    padding: 30px 0 120px 0;
+  }
+  
+  .spin-container {
+    width: 180px;
+    height: 240px;
+  }
+  
+  .achievement-carousel-card {
+    width: 180px;
+    height: 240px;
+    padding: 1rem;
+  }
+  
+  .carousel-ground {
+    width: 400px;
+    height: 400px;
+  }
+  
+  .carousel-center-title {
+    font-size: 1.2rem;
+  }
 }
 
 /* Project Modal */
@@ -695,48 +559,54 @@
   }
 
   /* 3D Carousel Mobile Adjustments */
-  .achievements-carousel {
-    height: 600px;
-    perspective: 1200px;
+  .achievements-3d-section {
+    min-height: 500px;
+    padding: 0 1rem;
   }
-
-  .achievements-carousel-container {
-    height: 400px;
-    transform: rotateX(-3deg) translateY(-15px);
+  
+  .carousel-3d-container {
+    height: 450px;
+    perspective: 800px;
   }
-
+  
+  .spin-container {
+    width: 180px;
+    height: 240px;
+  }
+  
   .achievement-carousel-card {
-    width: 280px !important;
-    min-width: 280px !important;
-    max-width: 280px !important;
-    height: 360px !important;
-    min-height: 360px !important;
-    max-height: 360px !important;
-    padding: 1.5rem;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
+    height: 240px !important;
+    min-height: 240px !important;
+    max-height: 240px !important;
+    padding: 1rem;
   }
 
   .achievement-icon {
-    width: 60px;
-    height: 60px;
-    margin-bottom: 1rem;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.8rem;
   }
 
   .achievement-title {
-    font-size: 1.2rem;
+    font-size: 0.95rem;
   }
 
   .achievement-description {
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
   }
 
-  .achievements-carousel-controls {
-    padding: 0 2%;
+  .carousel-ground {
+    width: 400px;
+    height: 400px;
   }
 
-  .achievements-carousel-btn {
-    width: 45px;
-    height: 45px;
+  .carousel-center-title {
+    font-size: 1.2rem;
   }
 
   .project-modal {
@@ -773,53 +643,49 @@
   }
 
   /* Ultra-mobile 3D Carousel */
-  .achievements-carousel {
-    height: 500px;
-    perspective: 1000px;
-  }
-
-  .achievements-carousel-container {
+  .carousel-3d-container {
     height: 350px;
-    transform: rotateX(-2deg) translateY(-10px);
+    perspective: 800px;
   }
-
+  
+  .spin-container {
+    width: 150px;
+    height: 200px;
+  }
+  
   .achievement-carousel-card {
-    width: 250px !important;
-    min-width: 250px !important;
-    max-width: 250px !important;
-    height: 320px !important;
-    min-height: 320px !important;
-    max-height: 320px !important;
-    padding: 1.2rem;
+    width: 150px !important;
+    min-width: 150px !important;
+    max-width: 150px !important;
+    height: 200px !important;
+    min-height: 200px !important;
+    max-height: 200px !important;
+    padding: 0.8rem;
   }
 
   .achievement-icon {
-    width: 50px;
-    height: 50px;
-    margin-bottom: 0.8rem;
+    width: 35px;
+    height: 35px;
+    margin-bottom: 0.5rem;
   }
 
   .achievement-title {
-    font-size: 1.1rem;
-    margin-bottom: 0.8rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
   }
 
   .achievement-description {
-    font-size: 0.8rem;
-    margin-bottom: 0.8rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    -webkit-line-clamp: 2;
   }
 
   .achievement-date {
-    padding: 0.5rem 1rem;
-    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.7rem;
   }
 
-  .achievements-carousel-controls {
-    padding: 0 1%;
-  }
-
-  .achievements-carousel-btn {
-    width: 40px;
-    height: 40px;
+  .carousel-subtitle {
+    margin-bottom: 1.5rem;
   }
 }

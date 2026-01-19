@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './ProjectsSection.css';
 
@@ -11,12 +11,9 @@ interface ProjectsSectionProps {
 const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievements = [], sectionIndex }) => {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [filter, setFilter] = useState<string>('all');
-  const [activeAchievement, setActiveAchievement] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const mouseStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isDraggingRef = useRef(false);
+  const spinContainerRef = useRef<HTMLDivElement>(null);
+  const [isCarouselReady, setIsCarouselReady] = useState(false);
 
   // Get unique project types for filtering
   const projectTypes = ['all', ...new Set(projects.map(p => p.type || p.category || 'other'))];
@@ -25,171 +22,136 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
     ? projects
     : projects.filter(p => (p.type || p.category || 'other') === filter);
 
-  const handleNextAchievement = () => {
-    setActiveAchievement((prev) => (prev + 1) % achievements.length);
-  };
+  // 3D Carousel initialization and controls
+  useEffect(() => {
+    const initCarousel = () => {
+      if (!carouselRef.current || !spinContainerRef.current || achievements.length === 0) return;
 
-  const handlePrevAchievement = () => {
-    if (isScrolling) return;
-    setActiveAchievement((prev) => (prev - 1 + achievements.length) % achievements.length);
-  };
+      const spinContainer = spinContainerRef.current;
+      const cards = spinContainer.querySelectorAll('.achievement-carousel-card');
+      const radius = 350; // Carousel radius
+      const autoRotate = true;
+      const rotateSpeed = -60; // seconds per 360 degrees
+      
+      // Position cards in 3D circle
+      cards.forEach((card, i) => {
+        const angle = i * (360 / cards.length);
+        (card as HTMLElement).style.transform = `rotateY(${angle}deg) translateZ(${radius}px)`;
+        (card as HTMLElement).style.transition = 'transform 1s';
+        (card as HTMLElement).style.transitionDelay = `${(cards.length - i) / 4}s`;
+      });
 
-  const throttledScroll = (direction: 'next' | 'prev') => {
-    if (isScrolling) return;
-    setIsScrolling(true);
-    if (direction === 'next') {
-      handleNextAchievement();
-    } else {
-      handlePrevAchievement();
-    }
-    setTimeout(() => setIsScrolling(false), 300);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      if (e.deltaY > 0) {
-        throttledScroll('next');
-      } else {
-        throttledScroll('prev');
+      // Auto rotation animation
+      if (autoRotate) {
+        const animationName = rotateSpeed > 0 ? 'spin' : 'spinRevert';
+        spinContainer.style.animation = `${animationName} ${Math.abs(rotateSpeed)}s infinite linear`;
       }
-    }
-  };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  };
+      // Mouse interaction variables
+      let sX: number, sY: number, nX: number, nY: number;
+      let desX = 0, desY = 0, tX = 0, tY = 10;
+      let animationTimer: number;
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - touchStartRef.current.x;
-    const deltaY = touch.clientY - touchStartRef.current.y;
-    
-    // Only handle horizontal swipes (ignore vertical scrolling)
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-      if (deltaX > 0) {
-        throttledScroll('prev');
-      } else {
-        throttledScroll('next');
-      }
-    }
-    
-    touchStartRef.current = null;
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    mouseStartRef.current = { x: e.clientX, y: e.clientY };
-    isDraggingRef.current = true;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingRef.current || !mouseStartRef.current) return;
-    
-    const deltaX = e.clientX - mouseStartRef.current.x;
-    const deltaY = e.clientY - mouseStartRef.current.y;
-    
-    // Only handle horizontal drags (ignore vertical scrolling)
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
-      if (deltaX > 0) {
-        throttledScroll('prev');
-      } else {
-        throttledScroll('next');
-      }
-      mouseStartRef.current = null;
-      isDraggingRef.current = false;
-    }
-  };
-
-  const handleMouseUp = () => {
-    mouseStartRef.current = null;
-    isDraggingRef.current = false;
-  };
-
-  const handleMouseLeave = () => {
-    mouseStartRef.current = null;
-    isDraggingRef.current = false;
-  };
-
-  const getAchievementStyle = (index: number) => {
-    if (!achievements.length) return {};
-    
-    const total = achievements.length;
-    const position = index - activeAchievement;
-    
-    // Normalize position to handle wrapping
-    let normalizedPosition = position;
-    if (normalizedPosition > total / 2) normalizedPosition -= total;
-    if (normalizedPosition < -total / 2) normalizedPosition += total;
-    
-    // Active card stays at center
-    if (normalizedPosition === 0) {
-      return {
-        x: 0,
-        z: 0,
-        scale: 1,
-        opacity: 1,
-        rotateY: 0,
-        filter: 'brightness(1.2) saturate(1.1)',
-        zIndex: 100,
-        pointerEvents: 'auto'
+      const applyTransform = (obj: HTMLElement) => {
+        // Constrain the angle of camera (between 0 and 180)
+        if (tY > 180) tY = 180;
+        if (tY < 0) tY = 0;
+        // Apply the angle
+        obj.style.transform = `rotateX(${-tY}deg) rotateY(${tX}deg)`;
       };
-    }
-    
-    // Calculate positioning for other cards
-    const absPosition = Math.abs(normalizedPosition);
-    const side = normalizedPosition > 0 ? 1 : -1;
-    
-    // Distance multiplier based on position
-    const baseDistance = 300;
-    const distanceMultiplier = Math.min(absPosition, 3);
-    
-    const x = side * (baseDistance + (distanceMultiplier - 1) * 100);
-    const z = -150 * distanceMultiplier;
-    const rotateY = side * (25 + (distanceMultiplier - 1) * 10);
-    
-    // Visibility based on distance from center
-    if (absPosition === 1) {
-      // Immediate neighbors (left/right)
-      return {
-        x,
-        z,
-        scale: 0.8,
-        opacity: 0.7,
-        rotateY,
-        filter: 'brightness(0.8) blur(1px)',
-        zIndex: 50,
-        pointerEvents: 'auto'
+
+      const playSpin = (yes: boolean) => {
+        if (spinContainer) {
+          spinContainer.style.animationPlayState = yes ? 'running' : 'paused';
+        }
       };
-    } else if (absPosition === 2) {
-      // Second neighbors
-      return {
-        x,
-        z,
-        scale: 0.65,
-        opacity: 0.4,
-        rotateY,
-        filter: 'brightness(0.6) blur(2px)',
-        zIndex: 25,
-        pointerEvents: 'auto'
+
+      // Pointer events for smooth interaction
+      const handlePointerDown = (e: PointerEvent) => {
+        if (animationTimer) clearInterval(animationTimer);
+        // Don't prevent default for clicks on cards
+        if ((e.target as HTMLElement).closest('.achievement-carousel-card')) {
+          // Allow click to pass through
+        } else {
+          e.preventDefault();
+        }
+        
+        sX = e.clientX;
+        sY = e.clientY;
+        playSpin(false);
+
+        let hasMoved = false;
+
+        const handlePointerMove = (e: PointerEvent) => {
+          hasMoved = true;
+          nX = e.clientX;
+          nY = e.clientY;
+          desX = nX - sX;
+          desY = nY - sY;
+          tX += desX * 0.1;
+          tY += desY * 0.1;
+          applyTransform(carouselRef.current!);
+          sX = nX;
+          sY = nY;
+        };
+
+        const handlePointerUp = () => {
+          if (hasMoved) {
+            animationTimer = window.setInterval(() => {
+              desX *= 0.95;
+              desY *= 0.95;
+              tX += desX * 0.1;
+              tY += desY * 0.1;
+              applyTransform(carouselRef.current!);
+              
+              if (Math.abs(desX) < 0.5 && Math.abs(desY) < 0.5) {
+                clearInterval(animationTimer);
+                playSpin(true);
+              }
+            }, 17);
+          } else {
+            // No movement, just resume animation
+            playSpin(true);
+          }
+          
+          document.removeEventListener('pointermove', handlePointerMove);
+          document.removeEventListener('pointerup', handlePointerUp);
+        };
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
       };
-    } else {
-      // Far cards (hidden)
-      return {
-        x: side * (baseDistance * 2),
-        z: -400,
-        scale: 0.4,
-        opacity: 0.1,
-        rotateY: side * 60,
-        filter: 'brightness(0.3) blur(4px)',
-        zIndex: 1,
-        pointerEvents: 'none'
+
+      // Mouse wheel for zoom
+      const handleWheel = (e: WheelEvent) => {
+        // Only zoom if not scrolling the page
+        if (Math.abs(e.deltaY) > 0) {
+          e.preventDefault();
+          const scale = e.deltaY > 0 ? 0.95 : 1.05;
+          const currentScale = parseFloat(getComputedStyle(spinContainer).getPropertyValue('--scale') || '1');
+          const newScale = Math.max(0.3, Math.min(1.5, currentScale * scale));
+          spinContainer.style.setProperty('--scale', newScale.toString());
+        }
       };
-    }
-  };
+
+      const carouselElement = carouselRef.current;
+      carouselElement.addEventListener('pointerdown', handlePointerDown);
+      carouselElement.addEventListener('wheel', handleWheel, { passive: false });
+
+      setIsCarouselReady(true);
+
+      return () => {
+        if (animationTimer) clearInterval(animationTimer);
+        if (carouselElement) {
+          carouselElement.removeEventListener('pointerdown', handlePointerDown);
+          carouselElement.removeEventListener('wheel', handleWheel);
+        }
+      };
+    };
+
+    const timeoutId = setTimeout(initCarousel, 500);
+    return () => clearTimeout(timeoutId);
+  }, [achievements]);
 
   return (
     <section className="journey-section projects-section" data-section={sectionIndex}>
@@ -311,94 +273,51 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
           </AnimatePresence>
         </motion.div>
 
-        {/* Achievements */}
+        {/* Achievements - 3D Carousel */}
         {achievements.length > 0 && (
           <motion.div
-            className="achievements-section"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            className="achievements-3d-section"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
             <h3 className="achievements-title gradient-text">Notable Achievements</h3>
             
-            <div 
-              className="achievements-carousel"
-              ref={carouselRef}
-              onWheel={handleWheel}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              style={{ cursor: isDraggingRef.current ? 'grabbing' : 'grab' }}
-            >
-              <div className="achievements-carousel-container">
-                <AnimatePresence mode="popLayout">
-                  {achievements.map((achievement, index) => {
-                    const style = getAchievementStyle(index);
-                    // @ts-ignore
-                    const isHidden = style.opacity < 0.1;
-                    
-                    if (isHidden && achievements.length > 5) return null;
-                    
-                    return (
-                      <motion.div
-                        key={index}
-                        className={`achievement-carousel-card glass ${index === activeAchievement ? 'active-achievement-card' : ''}`}
-                        initial={false}
-                        animate={{
-                          x: style.x,
-                          z: style.z,
-                          scale: style.scale,
-                          opacity: style.opacity,
-                          rotateY: style.rotateY,
-                          filter: style.filter
-                        } as any}
-                        style={{
-                          zIndex: style.zIndex,
-                          pointerEvents: style.pointerEvents
-                        } as any}
-                        transition={{ 
-                          duration: 0.6, 
-                          ease: [0.25, 0.46, 0.45, 0.94]
-                        }}
-                        onClick={() => setActiveAchievement(index)}
-                      >
-                        <div className="achievement-icon">
-                          <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
-                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/>
-                          </svg>
-                        </div>
-                        <h4 className="achievement-title">{achievement.title || achievement.name}</h4>
-                        <p className="achievement-description">{achievement.description}</p>
-                        {achievement.date && (
-                          <div className="achievement-date">{achievement.date}</div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-                
-                {/* Navigation Controls */}
-                <div className="achievements-carousel-controls">
-                  <button className="achievements-carousel-btn prev" onClick={handlePrevAchievement} aria-label="Previous">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                  </button>
-                  <button className="achievements-carousel-btn next" onClick={handleNextAchievement} aria-label="Next">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                  </button>
+            <div className="carousel-3d-container">
+              <div 
+                ref={carouselRef}
+                className="drag-container"
+                style={{ cursor: 'grab' }}
+              >
+                <div 
+                  ref={spinContainerRef}
+                  className="spin-container"
+                  style={{ '--scale': '1' } as React.CSSProperties}
+                >
+                  {achievements.map((achievement: any, index: number) => (
+                    <div
+                      key={index}
+                      className="achievement-carousel-card glass"
+                      style={{ opacity: isCarouselReady ? 1 : 0, transition: 'opacity 0.5s' }}
+                    >
+                      <div className="achievement-icon">
+                        <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/>
+                        </svg>
+                      </div>
+                      <div className="achievement-date">{achievement.date}</div>
+                      <h4 className="achievement-title">{achievement.title || achievement.name}</h4>
+                      <p className="achievement-description">{achievement.description}</p>
+                    </div>
+                  ))}
+                  {/* Central title */}
+                  <div className="carousel-center-title">
+                    <h4>Key Achievements</h4>
+                  </div>
                 </div>
-                
-                {/* Scroll Hint */}
-                <div className="achievements-carousel-scroll-hint">
-                  Scroll or swipe to explore achievements
-                </div>
+                {/* Ground reflection effect */}
+                <div className="carousel-ground"></div>
               </div>
             </div>
           </motion.div>

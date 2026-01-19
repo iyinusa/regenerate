@@ -299,7 +299,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
   }, [events]);
 
   return (
-    <section className="journey-section timeline-section" style={{ height: '100vh', position: 'relative', overflow: 'hidden' }}>
+    <section className="journey-section timeline-section" style={{ height: '100vh', position: 'relative', overflow: 'hidden' }} data-section={_sectionIndex}>
       <div 
         ref={containerRef} 
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1, outline: 'none' }}
@@ -308,7 +308,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
       {/* Title Overlay */}
       <div className="timeline-title-overlay" style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center', width: '90%' }}>
         <h2 className="section-title gradient-text" style={{ fontSize: '2.5rem', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Chronicles</h2>
-        <p className="section-subtitle" style={{ fontSize: '1rem', opacity: 0.8 }}>Drag to explore • Tap nodes for details</p>
+        <p className="section-subtitle" style={{ fontSize: '1rem', opacity: 0.8, marginBottom: '3rem' }}>Drag to explore • Tap nodes for details</p>
       </div>
 
       {/* Details Popup */}
@@ -319,12 +319,12 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
             initial={{ opacity: 0, scale: 0.5, y: 50, borderRadius: '50%' }}
             animate={{ opacity: 1, scale: 1, y: 0, borderRadius: '16px' }}
             exit={{ opacity: 0, scale: 0.5, y: 20, borderRadius: '50%' }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            transition={{ type: "spring", damping: 45, stiffness: 100 }}
             style={{
                 position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
+                top: '25%',
+                left: '5%',
+                transform: 'translate(-25%, -5%)',
                 width: '85%',
                 maxWidth: '450px',
                 padding: '2.5rem',
