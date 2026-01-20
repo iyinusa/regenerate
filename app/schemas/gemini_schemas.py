@@ -94,7 +94,7 @@ class ProfileExtractionResult(BaseModel):
     
     experiences: Optional[List[ExperienceItem]] = Field(default=None, description="Work experience history")
     education: Optional[List[EducationItem]] = Field(default=None, description="Educational background")
-    skills: Optional[List[str]] = Field(default=None, description="Technical and soft skills")
+    skills: Optional[List[str]] = Field(default=None, description="Technical, leadership, tools, and soft skills")
     projects: Optional[List[ProjectItem]] = Field(default=None, description="Notable projects")
     achievements: Optional[List[AchievementItem]] = Field(default=None, description="Professional achievements, awards, and recognitions")
     certifications: Optional[List[CertificationItem]] = Field(default=None, description="Professional certifications")

@@ -1,19 +1,41 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import SectionDataEditor from './SectionDataEditor';
+import { projectsConfig } from './sectionEditorConfig';
 import './ProjectsSection.css';
 
 interface ProjectsSectionProps {
   projects: any[];
   achievements?: any[];
   sectionIndex: number;
+  historyId?: string; // For editing functionality
 }
 
-const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievements = [], sectionIndex }) => {
+const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProjects, achievements = [], sectionIndex, historyId }) => {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [projects, setProjects] = useState(initialProjects || []);
   const carouselRef = useRef<HTMLDivElement>(null);
   const spinContainerRef = useRef<HTMLDivElement>(null);
   const [isCarouselReady, setIsCarouselReady] = useState(false);
+
+  // Update local projects when prop changes
+  useEffect(() => {
+    setProjects(initialProjects || []);
+  }, [initialProjects]);
+
+  // Handler for projects update from modal
+  const handleProjectsUpdate = (updatedProjects: any[]) => {
+    setProjects(updatedProjects);
+    setSelectedProject(null); // Close any open project detail
+  };
+
+  // Handler to open edit modal
+  const handleOpenEditModal = () => {
+    setIsEditModalOpen(true);
+    setSelectedProject(null); // Close any open project detail
+  };
 
   // Get unique project types for filtering
   const projectTypes = ['all', ...new Set(projects.map(p => p.type || p.category || 'other'))];
@@ -162,7 +184,41 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="section-title gradient-text">Projects & Achievements</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <h2 className="section-title gradient-text" style={{ margin: 0 }}>Projects & Achievements</h2>
+            {historyId && (
+              <button
+                onClick={handleOpenEditModal}
+                className="edit-section-btn"
+                title="Edit Projects & Achievements"
+                style={{
+                  background: 'rgba(0, 212, 255, 0.15)',
+                  border: '1px solid rgba(0, 212, 255, 0.3)',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#00d4ff',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.25)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.15)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="m18 2 4 4-5.5 5.5-4-4L18 2z"></path>
+                  <path d="M11.5 6.5 6 12v4h4l5.5-5.5"></path>
+                </svg>
+              </button>
+            )}
+          </div>
           <p className="section-subtitle">Innovative solutions and impactful contributions</p>
         </motion.div>
 
@@ -354,6 +410,18 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, achievement
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Edit Modal */}
+        {historyId && (
+          <SectionDataEditor
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            config={projectsConfig}
+            items={projects}
+            historyId={historyId}
+            onItemsUpdate={handleProjectsUpdate}
+          />
+        )}
       </div>
     </section>
   );

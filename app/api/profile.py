@@ -560,3 +560,475 @@ async def delete_timeline_event(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete timeline event: {str(e)}"
         )
+
+
+# =====================================================================
+# Professional Experience CRUD Endpoints
+# =====================================================================
+
+@router.put(
+    "/experiences/{history_id}",
+    summary="Update Professional Experiences",
+    description="Update professional experiences data for a specific profile history."
+)
+async def update_experiences(
+    history_id: str,
+    experiences: List[Dict[str, Any]],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update professional experiences for a specific profile history.
+    
+    This endpoint allows updating the experiences section of the structured_data,
+    enabling inline editing of the Professional Experience section.
+    
+    Args:
+        history_id: The profile history identifier
+        experiences: Updated list of professional experiences
+        db: Database session
+        
+    Returns:
+        Updated experiences data
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Updating experiences for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Update experiences
+        structured_data['experiences'] = experiences
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data - ensure proper JSON serialization
+        from sqlalchemy.orm.attributes import flag_modified
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')  # Mark JSON field as modified
+        await db.commit()
+        await db.refresh(history)
+        
+        logger.info(f"Successfully updated experiences for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Professional experiences updated successfully",
+            "experiences": structured_data.get('experiences', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update experiences for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update experiences: {str(e)}"
+        )
+
+
+@router.post(
+    "/experiences/{history_id}/items",
+    summary="Add Professional Experience",
+    description="Add a new professional experience to the profile."
+)
+async def add_experience(
+    history_id: str,
+    experience_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Add a new professional experience.
+    
+    Args:
+        history_id: The profile history identifier
+        experience_data: New experience data to add
+        db: Database session
+        
+    Returns:
+        Success response with updated experiences
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        import uuid
+        
+        logger.info(f"Adding new experience for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Ensure experiences list exists
+        if 'experiences' not in structured_data:
+            structured_data['experiences'] = []
+        
+        # Add unique ID if not provided
+        if 'id' not in experience_data:
+            experience_data['id'] = str(uuid.uuid4())
+        
+        # Add the new experience
+        structured_data['experiences'].append(experience_data)
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully added experience for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Professional experience added successfully",
+            "experience": experience_data,
+            "experiences": structured_data.get('experiences', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to add experience for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add experience: {str(e)}"
+        )
+
+
+@router.delete(
+    "/experiences/{history_id}/items/{experience_id}",
+    summary="Delete Professional Experience",
+    description="Delete a specific professional experience."
+)
+async def delete_experience(
+    history_id: str,
+    experience_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Delete a professional experience.
+    
+    Args:
+        history_id: The profile history identifier
+        experience_id: The experience identifier to delete
+        db: Database session
+        
+    Returns:
+        Success response with updated experiences
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Deleting experience {experience_id} for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data
+        structured_data = history.structured_data or {}
+        
+        if 'experiences' not in structured_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Professional experiences not found"
+            )
+        
+        # Find and remove the experience
+        experiences = structured_data['experiences']
+        original_count = len(experiences)
+        structured_data['experiences'] = [e for e in experiences if e.get('id') != experience_id]
+        
+        if len(structured_data['experiences']) == original_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Professional experience not found: {experience_id}"
+            )
+        
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully deleted experience {experience_id} for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Professional experience deleted successfully",
+            "experiences": structured_data.get('experiences', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete experience {experience_id} for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete experience: {str(e)}"
+        )
+
+
+# =====================================================================
+# Projects CRUD Endpoints
+# =====================================================================
+
+@router.put(
+    "/projects/{history_id}",
+    summary="Update Projects",
+    description="Update projects data for a specific profile history."
+)
+async def update_projects(
+    history_id: str,
+    projects: List[Dict[str, Any]],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update projects for a specific profile history.
+    
+    This endpoint allows updating the projects section of the structured_data,
+    enabling inline editing of the Projects section.
+    
+    Args:
+        history_id: The profile history identifier
+        projects: Updated list of projects
+        db: Database session
+        
+    Returns:
+        Updated projects data
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Updating projects for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Update projects
+        structured_data['projects'] = projects
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data - ensure proper JSON serialization
+        from sqlalchemy.orm.attributes import flag_modified
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')  # Mark JSON field as modified
+        await db.commit()
+        await db.refresh(history)
+        
+        logger.info(f"Successfully updated projects for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Projects updated successfully",
+            "projects": structured_data.get('projects', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update projects for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update projects: {str(e)}"
+        )
+
+
+@router.post(
+    "/projects/{history_id}/items",
+    summary="Add Project",
+    description="Add a new project to the profile."
+)
+async def add_project(
+    history_id: str,
+    project_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Add a new project.
+    
+    Args:
+        history_id: The profile history identifier
+        project_data: New project data to add
+        db: Database session
+        
+    Returns:
+        Success response with updated projects
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        import uuid
+        
+        logger.info(f"Adding new project for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data or create new
+        structured_data = history.structured_data or {}
+        
+        # Ensure projects list exists
+        if 'projects' not in structured_data:
+            structured_data['projects'] = []
+        
+        # Add unique ID if not provided
+        if 'id' not in project_data:
+            project_data['id'] = str(uuid.uuid4())
+        
+        # Add the new project
+        structured_data['projects'].append(project_data)
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully added project for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Project added successfully",
+            "project": project_data,
+            "projects": structured_data.get('projects', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to add project for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add project: {str(e)}"
+        )
+
+
+@router.delete(
+    "/projects/{history_id}/items/{project_id}",
+    summary="Delete Project",
+    description="Delete a specific project."
+)
+async def delete_project(
+    history_id: str,
+    project_id: str,
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Delete a project.
+    
+    Args:
+        history_id: The profile history identifier
+        project_id: The project identifier to delete
+        db: Database session
+        
+    Returns:
+        Success response with updated projects
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        logger.info(f"Deleting project {project_id} for history_id: {history_id}")
+        
+        # Find the profile history record
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Get existing structured data
+        structured_data = history.structured_data or {}
+        
+        if 'projects' not in structured_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Projects not found"
+            )
+        
+        # Find and remove the project
+        projects = structured_data['projects']
+        original_count = len(projects)
+        structured_data['projects'] = [p for p in projects if p.get('id') != project_id]
+        
+        if len(structured_data['projects']) == original_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found: {project_id}"
+            )
+        
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save updated data
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully deleted project {project_id} for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Project deleted successfully",
+            "projects": structured_data.get('projects', []),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete project {project_id} for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete project: {str(e)}"
+        )

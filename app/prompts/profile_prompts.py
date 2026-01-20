@@ -177,12 +177,12 @@ The provided URL is just the starting point. You MUST use Google Search (and URL
 **Phase 1: Basic Profile Data & Link Discovery**
 Extract the standard profile fields:
 - name: Full name
-- title: Current professional title
+- title: Current professional title or role
 - location: Geographic location
 - bio: Professional summary
 - experiences: Work history (with start/end dates)
 - education: Educational history (with dates)
-- skills: Technical and soft skills
+- skills: Technical, leadership, tools, and soft skills
 - projects: Notable projects (with dates)
 - achievements: Awards and recognitions (with dates/year)
 - certifications: Professional certifications

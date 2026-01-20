@@ -211,6 +211,7 @@ const Journey: React.FC = () => {
             experiences={profile.experiences}
             journey={journey}
             sectionIndex={2}
+            historyId={historyId || undefined}
           />
         )}
 
@@ -219,6 +220,7 @@ const Journey: React.FC = () => {
           <SkillsSection 
             skills={profile.skills}
             journey={journey}
+            profile={profile}
             sectionIndex={3}
           />
         )}
@@ -229,6 +231,7 @@ const Journey: React.FC = () => {
             projects={profile.projects}
             achievements={profile.achievements}
             sectionIndex={4}
+            historyId={historyId || undefined}
           />
         )}
 

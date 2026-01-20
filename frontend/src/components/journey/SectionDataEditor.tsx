@@ -20,17 +20,36 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
   historyId,
   onItemsUpdate
 }) => {
-  const [items, setItems] = useState<any[]>(initialItems);
+  const [items, setItems] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Ensure all items have IDs for proper tracking
+  const ensureItemIds = (itemsList: any[]) => {
+    // Ensure itemsList is actually an array
+    if (!Array.isArray(itemsList)) {
+      console.warn('Items is not an array:', itemsList);
+      return [];
+    }
+    return itemsList.map((item, index) => {
+      if (!item.id) {
+        return {
+          ...item,
+          id: `${config.itemName}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+        };
+      }
+      return item;
+    });
+  };
+
   // Update items when prop changes
   useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
+    const itemsWithIds = ensureItemIds(initialItems || []);
+    setItems(itemsWithIds);
+  }, [initialItems, config.itemName]);
 
   // Handle save items to backend
   const saveItems = async () => {
@@ -71,7 +90,14 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
 
   // Handle item edit
   const handleEditItem = (item: any) => {
-    setEditingItem({ ...item });
+    // Ensure tags fields are arrays
+    const normalizedItem = { ...item };
+    config.fields.forEach(field => {
+      if (field.type === 'tags' && !Array.isArray(normalizedItem[field.name])) {
+        normalizedItem[field.name] = normalizedItem[field.name] ? [normalizedItem[field.name]] : [];
+      }
+    });
+    setEditingItem(normalizedItem);
     setIsCreating(false);
   };
 
@@ -113,7 +139,7 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
 
   // Handle item delete
   const handleDeleteItem = (itemId: string) => {
-    setItems(items.filter(item => item.id !== itemId));
+    setItems(items.filter(item => (item.id || item) !== itemId));
   };
 
   // Handle field change with special handling for category and tags
@@ -388,7 +414,11 @@ const ItemEditForm: React.FC<ItemEditFormProps> = ({
 
       <div className="form-grid">
         {config.fields.map((field) => {
-          const value = item[field.name] || field.defaultValue || '';
+          // For tags fields, ensure default is an array, not a string
+          const defaultValue = field.type === 'tags' ? [] : (field.defaultValue || '');
+          const value = item[field.name] !== undefined && item[field.name] !== null 
+            ? item[field.name] 
+            : defaultValue;
 
           return (
             <div key={field.name} className={`form-group ${field.type === 'textarea' ? 'full-width' : ''}`}>
@@ -428,7 +458,7 @@ const ItemEditForm: React.FC<ItemEditFormProps> = ({
               ) : field.type === 'tags' ? (
                 <div className="tags-input-container">
                   <div className="tags-display">
-                    {(value as string[])?.map((tag, idx) => (
+                    {Array.isArray(value) && value.map((tag, idx) => (
                       <span key={idx} className="tag-chip">
                         {tag}
                         <button

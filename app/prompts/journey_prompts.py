@@ -53,9 +53,14 @@ JOURNEY_STRUCTURE_SCHEMA: Dict[str, Any] = {
                 "properties": {
                     "title": {"type": "string", "description": "Chapter title e.g., 'The Foundation Years'"},
                     "period": {"type": "string"},
-                    "narrative": {"type": "string"}
+                    "narrative": {"type": "string"},
+                    "key_learnings": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "3-5 key learnings from this chapter"
+                    }
                 },
-                "required": ["title", "period", "narrative"]
+                "required": ["title", "period", "narrative", "key_learnings"]
             }
         },
         "skills_evolution": {
@@ -212,7 +217,7 @@ Create a structured journey that:
 **OUTPUT REQUIREMENTS:**
 - summary: Headline, narrative, career span, key themes
 - milestones: Chronologically ordered significant events
-- career_chapters: 3-5 distinct career phases with narratives
+- career_chapters: 3-5 distinct career phases with narratives and key learnings
 - skills_evolution: CRITICAL - Detailed progression showing skills acquired over time with periods, stages, milestones, descriptions, and context
 - impact_metrics: Quantified career statistics
 
