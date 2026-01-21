@@ -442,17 +442,18 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
             transition={{ type: "spring", damping: 45, stiffness: 100 }}
             style={{
                 position: 'absolute',
-                top: '25%',
-                left: '5%',
-                transform: 'translate(-25%, -5%)',
+                top: '0%',
+                left: 'auto',
+                transform: 'translate(0%, auto)',
                 width: '85%',
                 maxWidth: '450px',
                 padding: '2.5rem',
                 zIndex: 10,
-                background: 'rgba(12, 12, 28, 0.95)',
+                background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(80, 200, 255, 0.25)',
                 boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 200, 255, 0.1)',
-                backdropFilter: 'blur(12px)'
+                backdropFilter: 'blur(12px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(12px) saturate(180%)',
             }}
           >
             <button 

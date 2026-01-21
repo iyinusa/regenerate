@@ -19,7 +19,6 @@
   padding: 1.5rem;
   height: fit-content;
   position: sticky;
-  top: 2rem;
 }
 
 .exp-nav-item {
@@ -233,13 +232,17 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  background: linear-gradient(135deg, #111122 0%, #0b0b15 100%);
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
   transform: rotateY(0deg);
   z-index: 2;
 }
 
 .chapter-card-back {
-  background: linear-gradient(135deg, #0b0b15 0%, #111122 100%);
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
   justify-content: flex-start;
   align-items: flex-start;
   overflow-y: auto;
@@ -340,7 +343,7 @@
     top: 0;
     display: flex;
     flex-direction: row;
-    overflow-x: auto;
+    overflow-x: auto !important;
     gap: 0.5rem;
     padding: 1rem;
   }

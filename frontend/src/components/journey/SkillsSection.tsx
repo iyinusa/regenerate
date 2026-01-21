@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
@@ -20,6 +20,12 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
   // State for interactive radar chart
   const [radarView, setRadarView] = useState<'domains' | 'skills'>('domains');
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  
+  // 3D Carousel State
+  const [is3DMode, setIs3DMode] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const spinContainerRef = useRef<HTMLDivElement>(null);
+  const [isCarouselReady, setIsCarouselReady] = useState(false);
 
   // Debug logging to help troubleshoot
   useEffect(() => {
@@ -43,12 +49,22 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
     profile
   );
 
-  // Prepare radar data based on current view
+  // Prepare radar data and carousel items based on current view
   let radarData;
+  let carouselItems: { id: string, label: string, score: number, type: 'domain' | 'skill' }[] = [];
   
   if (radarView === 'domains') {
     // Show domain-level proficiency - ensure all domains are visible
     const allDomains = ['Technical', 'Leadership', 'Tools', 'Soft Skills', 'Other'];
+    
+    // Prepare items for carousel
+    carouselItems = allDomains.map(domain => ({
+      id: domain,
+      label: domain,
+      score: skillProficiencyScores.scores[domain] || 0,
+      type: 'domain' as const
+    }));
+
     radarData = {
       labels: allDomains,
       datasets: [
@@ -84,6 +100,14 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
       }
     }
     
+    // Prepare items for carousel
+    carouselItems = skillsForRadar.map(s => ({
+      id: s.skill,
+      label: s.skill,
+      score: s.score,
+      type: 'skill' as const
+    }));
+
     radarData = {
       labels: skillsForRadar.map(s => s.skill),
       datasets: [
@@ -189,6 +213,139 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
     },
   };
 
+  // 3D Carousel Logic
+  useEffect(() => {
+    if (!is3DMode) return;
+
+    const initCarousel = () => {
+      if (!carouselRef.current || !spinContainerRef.current || carouselItems.length === 0) return;
+
+      const spinContainer = spinContainerRef.current;
+      const cards = spinContainer.querySelectorAll('.skills-carousel-card');
+      const radius = 250; 
+      const autoRotate = true;
+      const rotateSpeed = -60; // seconds per 360 degrees
+      
+      // Position cards in 3D circle
+      cards.forEach((card: Element, i: number) => {
+        const angle = i * (360 / cards.length);
+        (card as HTMLElement).style.transform = `rotateY(${angle}deg) translateZ(${radius}px)`;
+        (card as HTMLElement).style.transition = 'transform 1s';
+        (card as HTMLElement).style.transitionDelay = `${(cards.length - i) / 4}s`;
+      });
+
+      // Auto rotation animation
+      if (autoRotate) {
+        const animationName = rotateSpeed > 0 ? 'spin' : 'spinRevert';
+        spinContainer.style.animation = `${animationName} ${Math.abs(rotateSpeed)}s infinite linear`;
+      }
+
+      // Mouse interaction variables
+      let sX: number, sY: number, nX: number, nY: number;
+      let desX = 0, desY = 0, tX = 0, tY = 10;
+      let animationTimer: number;
+
+      const applyTransform = (obj: HTMLElement) => {
+        // Constrain the angle of camera (between 0 and 180)
+        if (tY > 180) tY = 180;
+        if (tY < 0) tY = 0;
+        // Apply the angle
+        obj.style.transform = `rotateX(${-tY}deg) rotateY(${tX}deg)`;
+      };
+
+      const playSpin = (yes: boolean) => {
+        if (spinContainer) {
+          spinContainer.style.animationPlayState = yes ? 'running' : 'paused';
+        }
+      };
+
+      // Pointer events for smooth interaction
+      const handlePointerDown = (e: PointerEvent) => {
+        if (animationTimer) clearInterval(animationTimer);
+        // Don't prevent default for clicks on cards
+        if ((e.target as HTMLElement).closest('.skills-carousel-card')) {
+          // Allow click to pass through
+        } else {
+          e.preventDefault();
+        }
+        
+        sX = e.clientX;
+        sY = e.clientY;
+        playSpin(false);
+
+        let hasMoved = false;
+
+        const handlePointerMove = (e: PointerEvent) => {
+          hasMoved = true;
+          nX = e.clientX;
+          nY = e.clientY;
+          desX = nX - sX;
+          desY = nY - sY;
+          tX += desX * 0.1;
+          tY += desY * 0.1;
+          applyTransform(carouselRef.current!);
+          sX = nX;
+          sY = nY;
+        };
+
+        const handlePointerUp = () => {
+          if (hasMoved) {
+            animationTimer = window.setInterval(() => {
+              desX *= 0.95;
+              desY *= 0.95;
+              tX += desX * 0.1;
+              tY += desY * 0.1;
+              applyTransform(carouselRef.current!);
+              
+              if (Math.abs(desX) < 0.5 && Math.abs(desY) < 0.5) {
+                clearInterval(animationTimer);
+                playSpin(true);
+              }
+            }, 17);
+          } else {
+            // No movement, just resume animation
+            playSpin(true);
+          }
+          
+          document.removeEventListener('pointermove', handlePointerMove);
+          document.removeEventListener('pointerup', handlePointerUp);
+        };
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+      };
+
+      // Mouse wheel for zoom
+      const handleWheel = (e: WheelEvent) => {
+        // Only zoom if not scrolling the page
+        if (Math.abs(e.deltaY) > 0) {
+          e.preventDefault();
+          const scale = e.deltaY > 0 ? 0.95 : 1.05;
+          const currentScale = parseFloat(getComputedStyle(spinContainer).getPropertyValue('--scale') || '1');
+          const newScale = Math.max(0.3, Math.min(1.5, currentScale * scale));
+          spinContainer.style.setProperty('--scale', newScale.toString());
+        }
+      };
+
+      const carouselElement = carouselRef.current;
+      carouselElement.addEventListener('pointerdown', handlePointerDown);
+      carouselElement.addEventListener('wheel', handleWheel, { passive: false });
+
+      setIsCarouselReady(true);
+
+      return () => {
+        if (animationTimer) clearInterval(animationTimer);
+        if (carouselElement) {
+          carouselElement.removeEventListener('pointerdown', handlePointerDown);
+          carouselElement.removeEventListener('wheel', handleWheel);
+        }
+      };
+    };
+
+    const timeoutId = setTimeout(initCarousel, 500);
+    return () => clearTimeout(timeoutId);
+  }, [is3DMode, radarView, selectedDomain, carouselItems.length]); // Updated dependency array
+
 
 
   return (
@@ -200,56 +357,130 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="section-title gradient-text">Skills & Expertise</h2>
+          <h2 className="section-title skill-title gradient-text">Skills & Expertise</h2>
           <p className="section-subtitle">A comprehensive view of technical and professional capabilities</p>
         </motion.div>
 
-        {/* Radar Chart */}
+        {/* Radar Chart / 3D Carousel */}
         <motion.div
-          className="radar-container glass card-glow"
+          className={`radar-container ${is3DMode ? 'skills-3d-section' : ''}`}
           initial={{ opacity: 0, scale: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.2 }}
+          style={{ height: is3DMode ? '600px' : '500px', transition: 'height 0.3s ease' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h3 className="chart-title" style={{ margin: 0 }}>
               {radarView === 'domains' ? 'Skill Domains' : `${selectedDomain} Skills`}
             </h3>
-            {radarView === 'skills' && (
+            
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {radarView === 'skills' && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setRadarView('domains');
+                    setSelectedDomain(null);
+                  }}
+                  className="glass-btn"
+                  style={{
+                    background: 'rgba(0, 212, 255, 0.1)',
+                    border: '1px solid rgba(0, 212, 255, 0.3)',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    color: '#00d4ff',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>←</span> Back
+                </motion.button>
+              )}
+              
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setRadarView('domains');
-                  setSelectedDomain(null);
-                }}
+                onClick={() => setIs3DMode(!is3DMode)}
+                className="glass-btn"
                 style={{
-                  background: 'rgba(0, 212, 255, 0.2)',
-                  border: '1px solid rgba(0, 212, 255, 0.5)',
+                  background: is3DMode ? 'rgba(0, 212, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  border: is3DMode ? '1px solid #00d4ff' : '1px solid rgba(255, 255, 255, 0.2)',
                   borderRadius: '8px',
-                  padding: '8px 16px',
-                  color: '#00d4ff',
+                  padding: '6px 12px',
+                  color: is3DMode ? '#fff' : 'rgba(255, 255, 255, 0.7)',
                   cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
+                  fontSize: '13px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
               >
-                <span>←</span> Back to Domains
+                <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid currentColor', borderTopColor: 'transparent', transform: is3DMode ? 'rotate(45deg)' : 'none' }}></div>
+                {is3DMode ? '2D View' : '3D View'}
               </motion.button>
-            )}
+            </div>
           </div>
-          {radarView === 'domains' && (
+
+          {radarView === 'domains' && !is3DMode && (
             <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '1rem', marginTop: '-0.5rem' }}>
               Click on any domain to view individual skills
             </p>
           )}
-          <div className="radar-chart">
-            <Radar data={radarData} options={radarOptions} />
-          </div>
+
+          {is3DMode ? (
+            <div className="skills-carousel-container">
+              <div 
+                ref={carouselRef}
+                className="skills-drag-container"
+                style={{ cursor: 'grab' }}
+              >
+                <div 
+                  ref={spinContainerRef}
+                  className="skills-spin-container"
+                  style={{ '--scale': '1' } as React.CSSProperties}
+                >
+                  {carouselItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="skills-carousel-card glass"
+                      style={{ opacity: isCarouselReady ? 1 : 0, transition: 'opacity 0.5s' }}
+                      onClick={() => {
+                        if (item.type === 'domain') {
+                          setSelectedDomain(item.id);
+                          setRadarView('skills');
+                        }
+                      }}
+                    >
+                      <div className="skill-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" width="40" height="40" stroke="currentColor" strokeWidth="1.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <h4 className="skill-card-title">{item.label}</h4>
+                      <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', margin: '8px 0', overflow: 'hidden' }}>
+                        <div style={{ width: `${item.score}%`, height: '100%', background: '#00d4ff' }}></div>
+                      </div>
+                      <p className="skill-card-score">{Math.round(item.score)}% Proficiency</p>
+                      {item.type === 'domain' && (
+                         <span style={{ fontSize: '10px', marginTop: '8px', opacity: 0.7 }}>Click to explore</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Ground reflection effect */}
+                <div className="skills-carousel-ground"></div>
+              </div>
+            </div>
+          ) : (
+            <div className="radar-chart">
+              <Radar data={radarData} options={radarOptions} />
+            </div>
+          )}
         </motion.div>
 
 
@@ -268,7 +499,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
               {skillsEvolution.map((evolution: any, index: number) => (
                 <motion.div
                   key={index}
-                  className="evolution-item glass"
+                  className="evolution-item"
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -338,12 +569,13 @@ function categorizeSkills(skills: string[]): Record<string, string[]> {
   const leadershipKeywords = [
     'leadership', 'entrepreneurship', 'management', 'team lead', 'team leader', 'project management', 'product management', 'program management', 'people management', 'engineering management', 'technical leadership',
     'agile', 'scrum', 'kanban', 'lean', 'safe', 'waterfall', 'project planning', 'sprint planning',
-    'mentor', 'mentoring', 'coaching', 'training', 'onboarding', 'career development', 'performance management', 'talent development',
+    'mentor', 'mentoring', 'coaching', 'training', 'onboarding', 'career development', 'performance management', 'talent development', 'talent management', 'talent acquisition',
     'strategic planning', 'strategy', 'vision', 'roadmap', 'okr', 'kpi', 'goal setting',
     'stakeholder management', 'client management', 'vendor management', 'partnership',
     'change management', 'transformation', 'innovation', 'process improvement',
     'budget management', 'resource allocation', 'capacity planning', 'hiring', 'recruitment',
-    'cross-functional', 'collaboration', 'delegation', 'decision making', 'risk management', 'conflict resolution'
+    'cross-functional', 'collaboration', 'delegation', 'decision making', 'risk management', 'conflict resolution',
+    'executive', 'director', 'ceo', 'cto', 'coo', 'cfo', 'vp', 'vice president', 'head of', 'chief', 'founder', 'co-founder', 'business development', 'growth strategy'
   ];
   const toolsKeywords = [
     // Version Control
@@ -381,15 +613,38 @@ function categorizeSkills(skills: string[]): Record<string, string[]> {
     'documentation', 'technical writing', 'report writing', 'business writing'
   ];
 
+  // Helper function to check if skill matches keyword with proper word boundary handling
+  // This ensures accurate categorization by checking:
+  // 1. Exact match (skill === keyword)
+  // 2. Skill contains keyword as a word (with word boundaries)
+  // 3. Keyword contains skill (for compound skills)
+  const matchesKeyword = (skill: string, keyword: string): boolean => {
+    // Exact match
+    if (skill === keyword) return true;
+    
+    // Check if the skill contains the keyword
+    if (skill.includes(keyword)) return true;
+    
+    // Check if keyword contains the skill (for cases like "talent acquisition" matching "talent acquisition specialist")
+    if (keyword.includes(skill) && skill.length >= 3) return true;
+    
+    // Word boundary match - ensures "ai" doesn't match "training" but "ai" matches "ai engineer"
+    const wordBoundaryRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return wordBoundaryRegex.test(skill);
+  };
+
   skills.forEach(skill => {
-    const lowerSkill = skill.toLowerCase();
-    if (technicalKeywords.some(kw => lowerSkill.includes(kw))) {
-      categories['Technical'].push(skill);
-    } else if (leadershipKeywords.some(kw => lowerSkill.includes(kw))) {
+    const lowerSkill = skill.toLowerCase().trim();
+    
+    // Check each category in priority order (more specific categories first)
+    // Leadership should be checked before Soft Skills since there can be overlap
+    if (leadershipKeywords.some(kw => matchesKeyword(lowerSkill, kw))) {
       categories['Leadership'].push(skill);
-    } else if (toolsKeywords.some(kw => lowerSkill.includes(kw))) {
+    } else if (technicalKeywords.some(kw => matchesKeyword(lowerSkill, kw))) {
+      categories['Technical'].push(skill);
+    } else if (toolsKeywords.some(kw => matchesKeyword(lowerSkill, kw))) {
       categories['Tools'].push(skill);
-    } else if (softSkillsKeywords.some(kw => lowerSkill.includes(kw))) {
+    } else if (softSkillsKeywords.some(kw => matchesKeyword(lowerSkill, kw))) {
       categories['Soft Skills'].push(skill);
     } else {
       categories['Other'].push(skill);
@@ -743,14 +998,15 @@ function getSkillCategory(skill: string): string {
   ];
   
   const leadershipKeywords = [
-    'leadership', 'management', 'team lead', 'team leader', 'project management', 'product management', 'program management', 'people management', 'engineering management', 'technical leadership',
+    'leadership', 'entrepreneurship', 'management', 'team lead', 'team leader', 'project management', 'product management', 'program management', 'people management', 'engineering management', 'technical leadership',
     'agile', 'scrum', 'kanban', 'lean', 'safe', 'waterfall', 'project planning', 'sprint planning',
-    'mentor', 'mentoring', 'coaching', 'training', 'onboarding', 'career development', 'performance management', 'talent development',
+    'mentor', 'mentoring', 'coaching', 'training', 'onboarding', 'career development', 'performance management', 'talent development', 'talent management', 'talent acquisition',
     'strategic planning', 'strategy', 'vision', 'roadmap', 'okr', 'kpi', 'goal setting',
     'stakeholder management', 'client management', 'vendor management', 'partnership',
     'change management', 'transformation', 'innovation', 'process improvement',
     'budget management', 'resource allocation', 'capacity planning', 'hiring', 'recruitment',
-    'cross-functional', 'collaboration', 'delegation', 'decision making', 'risk management', 'conflict resolution'
+    'cross-functional', 'collaboration', 'delegation', 'decision making', 'risk management', 'conflict resolution',
+    'executive', 'director', 'ceo', 'cto', 'coo', 'cfo', 'vp', 'vice president', 'head of', 'chief', 'founder', 'co-founder', 'business development', 'growth strategy'
   ];
   
   const toolsKeywords = [
@@ -790,10 +1046,20 @@ function getSkillCategory(skill: string): string {
     'documentation', 'technical writing', 'report writing', 'business writing'
   ];
 
-  if (technicalKeywords.some(kw => lowerSkill.includes(kw))) return 'Technical';
-  if (leadershipKeywords.some(kw => lowerSkill.includes(kw))) return 'Leadership';
-  if (toolsKeywords.some(kw => lowerSkill.includes(kw))) return 'Tools';
-  if (softSkillsKeywords.some(kw => lowerSkill.includes(kw))) return 'Soft Skills';
+  // Helper function to check if skill matches keyword with proper word boundary handling
+  const matchesKeyword = (skill: string, keyword: string): boolean => {
+    if (skill === keyword) return true;
+    if (skill.includes(keyword)) return true;
+    if (keyword.includes(skill) && skill.length >= 3) return true;
+    const wordBoundaryRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return wordBoundaryRegex.test(skill);
+  };
+
+  // Check Leadership first to ensure proper categorization of management/business skills
+  if (leadershipKeywords.some(kw => matchesKeyword(lowerSkill, kw))) return 'Leadership';
+  if (technicalKeywords.some(kw => matchesKeyword(lowerSkill, kw))) return 'Technical';
+  if (toolsKeywords.some(kw => matchesKeyword(lowerSkill, kw))) return 'Tools';
+  if (softSkillsKeywords.some(kw => matchesKeyword(lowerSkill, kw))) return 'Soft Skills';
   return 'Other';
 }
 

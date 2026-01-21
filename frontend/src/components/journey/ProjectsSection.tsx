@@ -13,12 +13,18 @@ interface ProjectsSectionProps {
 
 const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProjects, achievements = [], sectionIndex, historyId }) => {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [filter, setFilter] = useState<string>('all');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [projects, setProjects] = useState(initialProjects || []);
   const carouselRef = useRef<HTMLDivElement>(null);
   const spinContainerRef = useRef<HTMLDivElement>(null);
   const [isCarouselReady, setIsCarouselReady] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const projectsCarouselRef = useRef<HTMLDivElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum swipe distance (in px)
+  const minSwipeDistance = 50;
 
   // Update local projects when prop changes
   useEffect(() => {
@@ -37,12 +43,74 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProj
     setSelectedProject(null); // Close any open project detail
   };
 
-  // Get unique project types for filtering
-  const projectTypes = ['all', ...new Set(projects.map(p => p.type || p.category || 'other'))];
+  // Projects carousel navigation
+  const nextProject = () => {
+    setCurrentIndex((prev) => (prev + 1) % projects.length);
+  };
 
-  const filteredProjects = filter === 'all'
-    ? projects
-    : projects.filter(p => (p.type || p.category || 'other') === filter);
+  const prevProject = () => {
+    setCurrentIndex((prev) => (prev - 1 + projects.length) % projects.length);
+  };
+
+  const goToProject = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  // Touch/Swipe handlers
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      nextProject();
+    } else if (isRightSwipe) {
+      prevProject();
+    }
+  };
+
+  // Mouse drag handlers for desktop
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<number | null>(null);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart(e.clientX);
+    e.preventDefault();
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+    e.preventDefault();
+  };
+
+  const onMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+    
+    const distance = dragStart - e.clientX;
+    const isLeftDrag = distance > minSwipeDistance;
+    const isRightDrag = distance < -minSwipeDistance;
+
+    if (isLeftDrag) {
+      nextProject();
+    } else if (isRightDrag) {
+      prevProject();
+    }
+
+    setIsDragging(false);
+    setDragStart(null);
+  };
 
   // 3D Carousel initialization and controls
   useEffect(() => {
@@ -222,111 +290,160 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProj
           <p className="section-subtitle">Innovative solutions and impactful contributions</p>
         </motion.div>
 
-        {/* Filter */}
+
+
+        {/* Projects Carousel */}
         <motion.div
-          className="project-filters"
+          className="projects-carousel-container"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          {projectTypes.map((type, index) => (
-            <button
-              key={index}
-              className={`filter-btn glass ${filter === type ? 'active' : ''}`}
-              onClick={() => setFilter(type)}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </button>
-          ))}
-        </motion.div>
-
-        {/* Projects Grid */}
-        <motion.div
-          className="projects-grid"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredProjects.map((project, index) => (
-              <motion.div
-                key={project.name || index}
-                className="project-card glass card-glow"
-                layout
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.5 }}
-                whileHover={{ y: -10 }}
-                onClick={() => setSelectedProject(index)}
-              >
-                {project.image && (
-                  <div className="project-image">
-                    <img src={project.image} alt={project.name} />
-                  </div>
-                )}
-                
-                <div className="project-content">
-                  {(project.type || project.category) && (
-                    <span className="project-category">{project.type || project.category}</span>
-                  )}
+          <div 
+            className="projects-carousel" 
+            ref={projectsCarouselRef}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={() => {
+              setIsDragging(false);
+              setDragStart(null);
+            }}
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          >
+            {/* Carousel Cards */}
+            <div className="projects-carousel-track">
+              <AnimatePresence mode="popLayout">
+                {projects.map((project, index) => {
+                  const isActive = index === currentIndex;
+                  const isNext = index === (currentIndex + 1) % projects.length;
+                  const isPrev = index === (currentIndex - 1 + projects.length) % projects.length;
                   
-                  <h3 className="project-name">{project.name || project.title}</h3>
-                  
-                  <p className="project-description">
-                    {project.description?.substring(0, 120)}{project.description?.length > 120 ? '...' : ''}
-                  </p>
+                  return (
+                    <motion.div
+                      key={project.name || index}
+                      className={`project-carousel-card glass ${
+                        isActive ? 'active' : isNext || isPrev ? 'adjacent' : 'hidden'
+                      }`}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ 
+                        opacity: isActive ? 1 : isNext || isPrev ? 0.4 : 0,
+                        scale: isActive ? 1 : isNext || isPrev ? 0.8 : 0.6,
+                        x: isActive ? 0 : isNext ? '60%' : isPrev ? '-60%' : 0,
+                        zIndex: isActive ? 10 : isNext || isPrev ? 5 : 1,
+                        rotateY: isActive ? 0 : isNext ? -15 : isPrev ? 15 : 0
+                      }}
+                      transition={{ 
+                        duration: 0.6, 
+                        ease: "easeInOut",
+                        opacity: { duration: 0.4 },
+                        scale: { duration: 0.5 },
+                        x: { duration: 0.6 },
+                        rotateY: { duration: 0.6 }
+                      }}
+                      whileHover={isActive ? { y: -10, scale: 1.02 } : {}}
+                      onClick={() => {
+                        if (isActive) {
+                          setSelectedProject(index);
+                        } else {
+                          setCurrentIndex(index);
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: 'auto',
+                        top: '0%',
+                        transform: 'translate(auto, -0%)',
+                      }}
+                    >
+                      {project.image && (
+                        <div className="project-image">
+                          <img src={project.image} alt={project.name} />
+                        </div>
+                      )}
+                      
+                      <div className="project-content">
+                        {(project.type || project.category) && (
+                          <span className="project-category">{project.type || project.category}</span>
+                        )}
+                        
+                        <h3 className="project-name">{project.name || project.title}</h3>
+                        
+                        <p className="project-description">
+                          {project.description?.substring(0, 120)}{project.description?.length > 120 ? '...' : ''}
+                        </p>
 
-                  {project.technologies && (
-                    <div className="project-tech">
-                      {project.technologies.slice(0, 4).map((tech: string, i: number) => (
-                        <span key={i} className="tech-badge">{tech}</span>
-                      ))}
-                      {project.technologies.length > 4 && (
-                        <span className="tech-badge">+{project.technologies.length - 4}</span>
-                      )}
-                    </div>
-                  )}
+                        {project.technologies && (
+                          <div className="project-tech">
+                            {project.technologies.slice(0, 4).map((tech: string, i: number) => (
+                              <span key={i} className="tech-badge">{tech}</span>
+                            ))}
+                            {project.technologies.length > 4 && (
+                              <span className="tech-badge">+{project.technologies.length - 4}</span>
+                            )}
+                          </div>
+                        )}
 
-                  {(project.link || project.github || project.demo) && (
-                    <div className="project-links">
-                      {project.link && (
-                        <a 
-                          href={project.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="project-link"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                            <path d="M13 3L16.293 6.293L9.293 13.293L10.707 14.707L17.707 7.707L21 11V3H13Z" fill="currentColor"/>
-                            <path d="M19 19H5V5H12L10 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V14L19 12V19Z" fill="currentColor"/>
-                          </svg>
-                          View
-                        </a>
-                      )}
-                      {project.github && (
-                        <a 
-                          href={project.github} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="project-link"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                            <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
-                          </svg>
-                          GitHub
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                        {(project.link || project.github || project.demo) && (
+                          <div className="project-links">
+                            {project.link && (
+                              <a 
+                                href={project.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="project-link"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+                                  <path d="M13 3L16.293 6.293L9.293 13.293L10.707 14.707L17.707 7.707L21 11V3H13Z" fill="currentColor"/>
+                                  <path d="M19 19H5V5H12L10 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V14L19 12V19Z" fill="currentColor"/>
+                                </svg>
+                                View
+                              </a>
+                            )}
+                            {project.github && (
+                              <a 
+                                href={project.github} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="project-link"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                                  <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+                                </svg>
+                                GitHub
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* Carousel Indicators */}
+            <div className="carousel-indicators">
+              {projects.map((_, index) => (
+                <button
+                  key={index}
+                  className={`carousel-indicator ${index === currentIndex ? 'active' : ''}`}
+                  onClick={() => goToProject(index)}
+                />
+              ))}
+            </div>
+
+            {/* Swipe Hint */}
+            <div className="swipe-hint">
+              <span>Swipe or drag to navigate</span>
+            </div>
+          </div>
         </motion.div>
 
         {/* Achievements - 3D Carousel */}
@@ -405,7 +522,7 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProj
                   </svg>
                 </button>
 
-                <ProjectDetail project={filteredProjects[selectedProject]} />
+                <ProjectDetail project={projects[selectedProject]} />
               </motion.div>
             </motion.div>
           )}

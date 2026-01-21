@@ -15,7 +15,9 @@
 }
 
 .section-editor-modal {
-  background: rgba(12, 12, 28, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+    backdrop-filter: blur(15px) saturate(180%);
   border: 1px solid rgba(80, 200, 255, 0.25);
   border-radius: 20px;
   width: 95%;
