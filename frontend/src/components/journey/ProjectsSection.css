@@ -61,8 +61,9 @@
 
 .project-carousel-card.active {
   background: rgba(0, 0, 0, 0.08);
-  -webkit-backdrop-filter: blur(15px) saturate(180%);
-  backdrop-filter: blur(15px) saturate(180%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  backdrop-filter: blur(25px) saturate(180%);
 }
 
 .project-carousel-card.adjacent {

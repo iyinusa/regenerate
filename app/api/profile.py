@@ -210,6 +210,8 @@ async def get_profile(
             "journey": job_data.get("journey", {}),
             "timeline": job_data.get("timeline", {}),
             "documentary": job_data.get("documentary", {}),
+            "intro_video": job_data.get("intro_video"),
+            "full_video": job_data.get("full_video"),
         }
         
     except HTTPException:
@@ -309,6 +311,8 @@ async def get_journey_by_guest_id(
             "journey": structured_data.get("journey", {}),
             "timeline": structured_data.get("timeline", {}),
             "documentary": structured_data.get("documentary", {}),
+            "intro_video": latest_history.intro_video,
+            "full_video": latest_history.full_video,
             "source_url": latest_history.source_url,
             "created_at": latest_history.created_at.isoformat(),
             "generated_at": structured_data.get("generated_at"),

@@ -226,6 +226,11 @@ class ProfileExtractionService:
                 
                 # If plan completed normally, update job with full data
                 if plan.status == TaskStatus.COMPLETED:
+                    # Extract video URLs from task results if available
+                    video_results = result_data.get("generate_video", {})
+                    intro_video = video_results.get("intro_video") or profile_data.get("intro_video")
+                    full_video = video_results.get("full_video") or profile_data.get("full_video")
+                    
                     # Save comprehensive data to database with all task results
                     await self._save_comprehensive_data_to_database(
                         history_id, 
@@ -245,6 +250,8 @@ class ProfileExtractionService:
                         "journey": journey_data,
                         "timeline": timeline_data,
                         "documentary": documentary_data,
+                        "intro_video": intro_video,
+                        "full_video": full_video,
                     })
                 else:
                     # Plan failed or was partially completed
@@ -336,7 +343,9 @@ class ProfileExtractionService:
                             structured_data={
                                 k: v for k, v in profile_data.items()
                                 if k not in ['raw_data', 'source_url', 'extraction_timestamp']
-                            }
+                            },
+                            intro_video=profile_data.get("intro_video"),
+                            full_video=profile_data.get("full_video")
                         )
                     )
                     await db.commit()
@@ -405,12 +414,19 @@ class ProfileExtractionService:
                         "captured_at": datetime.utcnow().isoformat()
                     }
                     
+                    # Extract video URLs from task results or profile data
+                    video_results = all_task_results.get("generate_video", {}) if all_task_results else {}
+                    intro_video = video_results.get("intro_video") or profile_data.get("intro_video")
+                    full_video = video_results.get("full_video") or profile_data.get("full_video")
+                    
                     await db.execute(
                         update(ProfileHistory)
                         .where(ProfileHistory.id == history_id)
                         .values(
                             raw_data=raw_data_comprehensive,
-                            structured_data=comprehensive_data
+                            structured_data=comprehensive_data,
+                            intro_video=intro_video,
+                            full_video=full_video
                         )
                     )
                     await db.commit()
@@ -469,6 +485,8 @@ class ProfileExtractionService:
                                 "journey": data.get("journey"),
                                 "timeline": data.get("timeline"),
                                 "documentary": data.get("documentary"),
+                                "intro_video": history.intro_video,
+                                "full_video": history.full_video,
                                 "history_id": history.id,
                                 "recovered": True
                             }

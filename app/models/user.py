@@ -41,6 +41,8 @@ class ProfileHistory(Base):
     source_url: Mapped[str] = mapped_column(String(1024))
     raw_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     structured_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    intro_video: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    full_video: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="profile_histories")

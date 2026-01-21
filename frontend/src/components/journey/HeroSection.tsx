@@ -1,14 +1,17 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import './HeroSection.css';
+import DocumentaryPlayer from './DocumentaryPlayer';
 
 interface HeroSectionProps {
   profile: any;
   documentary: any;
   journey: any;
+  introVideo?: string | null;
+  fullVideo?: string | null;
   sectionIndex: number;
 }
 
-const HeroSection: React.FC<HeroSectionProps> = ({ profile, documentary, journey, sectionIndex }) => {
+const HeroSection: React.FC<HeroSectionProps> = ({ profile, documentary, journey, introVideo, fullVideo, sectionIndex }) => {
   const { scrollY } = useScroll();
   
   // Parallax and fade effects on scroll
@@ -68,16 +71,28 @@ const HeroSection: React.FC<HeroSectionProps> = ({ profile, documentary, journey
             </div>
           </motion.div>
 
-          {/* Video Player Canvas */}
+          {/* Documentary Player */}
           <motion.div 
             className="hero-video-box glass"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
           >
-            <div className="video-canvas-placeholder">
-              <span>Documentary Video Player Canvas</span>
-            </div>
+            <DocumentaryPlayer 
+              documentary={{
+                ...documentary,
+                intro_url: introVideo,
+                full_video: fullVideo
+              }}
+              onGenerateVideo={() => {
+                // TODO: Implement video generation logic
+                console.log('Generate documentary video');
+              }}
+              onRegenerateVideo={() => {
+                // TODO: Implement video regeneration logic
+                console.log('Regenerate documentary video');
+              }}
+            />
           </motion.div>
         </div>
 

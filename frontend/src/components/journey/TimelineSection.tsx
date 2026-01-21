@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, AnimatePresence, useTransform } from 'framer-motion';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { gsap } from 'gsap';
@@ -382,12 +382,17 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
     };
   }, [events]);
 
+  // Parallax and fade effects on scroll
+  const { scrollY } = useScroll();
+  const opacity = useTransform(scrollY, [0, 350], [1, 0.6]);
+  const scale = useTransform(scrollY, [0, 350], [1, 0.8]);
+  const y = useTransform(scrollY, [0, 350], [0, 50]);
+
   return (
     <section className="journey-section timeline-section" style={{ height: '100vh', position: 'relative', overflow: 'hidden' }} data-section={_sectionIndex}>
-      <div 
-        ref={containerRef} 
-        style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1, outline: 'none' }}
-      />
+      <motion.div 
+          ref={containerRef} 
+        style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1, outline: 'none', opacity, scale, y }}></motion.div>
       
       {/* Title Overlay */}
       <div className="timeline-title-overlay" style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center', width: '90%' }}>
@@ -442,18 +447,18 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
             transition={{ type: "spring", damping: 45, stiffness: 100 }}
             style={{
                 position: 'absolute',
-                top: '0%',
-                left: 'auto',
-                transform: 'translate(0%, auto)',
+                top: '35%',
+                left: '8%',
+                transform: 'translate(-35%, -8%)',
                 width: '85%',
                 maxWidth: '450px',
                 padding: '2.5rem',
                 zIndex: 10,
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'rgba(0, 0, 0, 0.08)',
                 border: '1px solid rgba(80, 200, 255, 0.25)',
                 boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 200, 255, 0.1)',
-                backdropFilter: 'blur(12px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(25px) saturate(180%)',
             }}
           >
             <button 

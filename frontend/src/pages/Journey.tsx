@@ -60,6 +60,8 @@ const Journey: React.FC = () => {
   const [journey, setJourney] = useState<JourneyData | null>(null);
   const [timeline, setTimeline] = useState<TimelineData | null>(null);
   const [documentary, setDocumentary] = useState<DocumentaryData | null>(null);
+  const [introVideo, setIntroVideo] = useState<string | null>(null);
+  const [fullVideo, setFullVideo] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(0);
   
@@ -89,6 +91,8 @@ const Journey: React.FC = () => {
           setJourney(response.journey || null);
           setTimeline(response.timeline || null);
           setDocumentary(response.documentary || null);
+          setIntroVideo(response.intro_video || null);
+          setFullVideo(response.full_video || null);
           setHistoryId(response.history_id || null); // Capture history ID for editing
           setLoading(false);
         } else if (jobId) {
@@ -106,6 +110,8 @@ const Journey: React.FC = () => {
             setJourney(response.journey || null);
             setTimeline(response.timeline || null);
             setDocumentary(response.documentary || null);
+            setIntroVideo(response.intro_video || null);
+            setFullVideo(response.full_video || null);
             setLoading(false);
           } else {
             // Still processing, poll again
@@ -192,6 +198,8 @@ const Journey: React.FC = () => {
           profile={profile} 
           documentary={documentary}
           journey={journey}
+          introVideo={introVideo}
+          fullVideo={fullVideo}
           sectionIndex={0}
         />
 
