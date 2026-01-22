@@ -56,6 +56,10 @@
   margin: 0 auto 20px;
 }
 
+h2 {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

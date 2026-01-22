@@ -397,7 +397,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
       {/* Title Overlay */}
       <div className="timeline-title-overlay" style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 2, pointerEvents: 'none', textAlign: 'center', width: '90%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', pointerEvents: 'auto' }}>
-          <h2 className="section-title gradient-text" style={{ fontSize: '2.5rem', textShadow: '0 2px 10px rgba(0,0,0,0.5)', margin: 0 }}>
+          <h2 className="section-title gradient-text">
             Chronicles
           </h2>
           {historyId && (

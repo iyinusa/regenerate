@@ -165,7 +165,7 @@ const ChapterCard: React.FC<{ chapter: any; index: number }> = ({ chapter, index
 
   return (
     <motion.div
-      className="chapter-card-container"
+      className="chapter-card-container glass"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}

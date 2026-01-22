@@ -33,9 +33,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ profile, documentary, journey
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <h1 className="hero-name gradient-text">
+            <div className="hero-name gradient-text">
               {profile?.name || 'Professional Journey'}
-            </h1>
+            </div>
             <p className="hero-title">
               {journey?.summary?.headline || profile?.title || 'Innovator | Creator | Leader'}
             </p>

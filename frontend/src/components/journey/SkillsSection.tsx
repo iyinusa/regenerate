@@ -483,8 +483,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
           )}
         </motion.div>
 
-
-
+        
         {/* Skills Evolution */}
         {skillsEvolution.length > 0 && (
           <motion.div
