@@ -208,3 +208,16 @@
   }
 }
 
+/* Error Message Styles */
+.error-message {
+  background: rgba(255, 87, 87, 0.1);
+  border: 1px solid rgba(255, 87, 87, 0.3);
+  color: #ff5757;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  font-size: 0.9rem;
+}
+

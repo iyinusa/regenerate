@@ -189,7 +189,7 @@ const Regen: React.FC = () => {
         if (event.code !== 1000 && jobId) {
           setStatusMessage('Connection lost, attempting to reconnect...');
           // Attempt reconnection after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = window.setTimeout(() => {
             connectWebSocket(jobId);
           }, 3000);
         }

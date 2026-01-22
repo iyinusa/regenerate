@@ -1036,3 +1036,77 @@ async def delete_project(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete project: {str(e)}"
         )
+
+
+# =====================================================================
+# Documentary CRUD Endpoints
+# =====================================================================
+
+@router.put(
+    "/documentary/{history_id}",
+    summary="Update Documentary",
+    description="Update documentary data for a specific profile history."
+)
+async def update_documentary(
+    history_id: str,
+    documentary: Dict[str, Any],
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update documentary for a specific profile history.
+    
+    This endpoint allows updating the documentary section of the structured_data,
+    enabling inline editing of the Documentary section.
+    
+    Args:
+        history_id: The profile history identifier
+        documentary: Updated documentary data
+        db: Database session
+        
+    Returns:
+        Updated documentary data
+        
+    Raises:
+        HTTPException: If history not found or update fails
+    """
+    try:
+        # Get the profile history record
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(ProfileHistory).where(ProfileHistory.id == history_id)
+        )
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Update the documentary data
+        structured_data = history.structured_data or {}
+        structured_data['documentary'] = documentary
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        # Save to database
+        history.structured_data = structured_data
+        await db.commit()
+        
+        logger.info(f"Successfully updated documentary for history {history_id}")
+        
+        return {
+            "success": True,
+            "message": "Documentary updated successfully",
+            "documentary": structured_data.get('documentary', {}),
+            "updated_at": structured_data['updated_at']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update documentary for history {history_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update documentary: {str(e)}"
+        )

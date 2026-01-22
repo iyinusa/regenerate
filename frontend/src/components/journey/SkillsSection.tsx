@@ -357,7 +357,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="section-title skill-title gradient-text">Skills & Expertise</h2>
+          <h2 className="section-title skill-title gradient-text">Expertise</h2>
           <p className="section-subtitle">A comprehensive view of technical and professional capabilities</p>
         </motion.div>
 

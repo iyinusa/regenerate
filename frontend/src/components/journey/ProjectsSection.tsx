@@ -253,12 +253,12 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProj
           transition={{ duration: 0.8 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <h2 className="section-title gradient-text" style={{ margin: 0 }}>Projects & Achievements</h2>
+            <h2 className="section-title gradient-text" style={{ margin: 0 }}>Achievements</h2>
             {historyId && (
               <button
                 onClick={handleOpenEditModal}
                 className="edit-section-btn"
-                title="Edit Projects & Achievements"
+                title="Edit Achievements"
                 style={{
                   background: 'rgba(0, 212, 255, 0.15)',
                   border: '1px solid rgba(0, 212, 255, 0.3)',

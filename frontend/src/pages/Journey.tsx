@@ -201,6 +201,16 @@ const Journey: React.FC = () => {
           introVideo={introVideo}
           fullVideo={fullVideo}
           sectionIndex={0}
+          historyId={historyId || undefined}
+          onDocumentaryUpdate={setDocumentary}
+          onGenerateVideo={() => {
+            // TODO: Implement video generation logic
+            console.log('Generate documentary video');
+          }}
+          onRegenerateVideo={() => {
+            // TODO: Implement video regeneration logic
+            console.log('Regenerate documentary video');
+          }}
         />
 
         {/* Timeline Section */}
@@ -223,16 +233,6 @@ const Journey: React.FC = () => {
           />
         )}
 
-        {/* Skills Section */}
-        {profile?.skills && profile.skills.length > 0 && (
-          <SkillsSection 
-            skills={profile.skills}
-            journey={journey}
-            profile={profile}
-            sectionIndex={3}
-          />
-        )}
-
         {/* Projects Section */}
         {profile?.projects && profile.projects.length > 0 && (
           <ProjectsSection 
@@ -240,6 +240,16 @@ const Journey: React.FC = () => {
             achievements={profile.achievements}
             sectionIndex={4}
             historyId={historyId || undefined}
+          />
+        )}
+
+        {/* Skills Section */}
+        {profile?.skills && profile.skills.length > 0 && (
+          <SkillsSection 
+            skills={profile.skills}
+            journey={journey}
+            profile={profile}
+            sectionIndex={3}
           />
         )}
 
