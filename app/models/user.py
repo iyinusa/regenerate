@@ -37,6 +37,7 @@ class User(Base):
     linkedin_profile_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
 
     profile_histories: Mapped[List["ProfileHistory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    privacy_settings: Mapped[Optional["ProfilePrivacy"]] = relationship("ProfilePrivacy", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 class ProfileHistory(Base):
     __tablename__ = "rg_profile_history"

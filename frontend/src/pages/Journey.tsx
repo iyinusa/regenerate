@@ -56,7 +56,7 @@ interface DocumentaryData {
 
 const Journey: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { guestId } = useParams();
+  const { guestId, username } = useParams(); // Added username
   const { isAuthenticated, guestId: currentUserGuestId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,14 +77,16 @@ const Journey: React.FC = () => {
 
   // Check if user owns this journey (for editing permissions)
   // We compare the URL guestId with the authenticated user's guestId
-  const canEdit = isAuthenticated && guestId && currentUserGuestId && guestId === currentUserGuestId;
+  // Public view (username present) disables editing
+  const isPublicView = !!username;
+  const canEdit = !isPublicView && isAuthenticated && guestId && currentUserGuestId && guestId === currentUserGuestId;
 
   useEffect(() => {
-    // Determine if we're loading by jobId (traditional) or guestId (new format)
+    // Determine if we're loading by jobId (traditional), guestId (new format), or username (public)
     const jobId = searchParams.get('jobId');
     
-    if (!jobId && !guestId) {
-      setError('No job ID or guest ID provided');
+    if (!jobId && !guestId && !username) {
+      setError('No job ID, guest ID, or username provided');
       setLoading(false);
       return;
     }
@@ -93,6 +95,20 @@ const Journey: React.FC = () => {
       try {
         let response;
         
+        if (username) {
+            // Public profile fetch
+            response = await apiClient.request(`/api/v1/privacy/public/${username}`);
+            
+            setProfile(response.profile || null);
+            setJourney(response.journey || null);
+            setTimeline(response.timeline || null);
+            setDocumentary(response.documentary || null);
+            setIntroVideo(response.intro_video || null);
+            setFullVideo(response.full_video || null);
+            setLoading(false);
+            return;
+        }
+
         if (guestId) {
           // New format: /journey/{guest_id}
           response = await apiClient.getJourneyByGuestId(guestId);
@@ -305,7 +321,7 @@ const Journey: React.FC = () => {
             timeline={timeline}
             journey={journey}
             sectionIndex={1}
-            historyId={historyId || undefined}
+            historyId={isPublicView ? undefined : (historyId || undefined)}
             onRequestEdit={handleEdit}
           />
         )}
@@ -316,7 +332,7 @@ const Journey: React.FC = () => {
             experiences={profile.experiences}
             journey={journey}
             sectionIndex={2}
-            historyId={historyId || undefined}
+            historyId={isPublicView ? undefined : (historyId || undefined)}
             onRequestEdit={handleEdit}
           />
         )}
@@ -327,7 +343,7 @@ const Journey: React.FC = () => {
             projects={profile.projects}
             achievements={profile.achievements}
             sectionIndex={4}
-            historyId={historyId || undefined}
+            historyId={isPublicView ? undefined : (historyId || undefined)}
             onRequestEdit={handleEdit}
           />
         )}
@@ -341,6 +357,10 @@ const Journey: React.FC = () => {
             sectionIndex={3}
           />
         )}
+
+        {/* Education Section */}
+
+        {/* Certificate Section */}
 
         {/* Documentary Section */}
         {documentary && (

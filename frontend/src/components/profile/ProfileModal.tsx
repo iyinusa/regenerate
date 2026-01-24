@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import ProfileTab from './ProfileTab';
+import PrivacyTab from './PrivacyTab';
 import './ProfileModal.css';
 
 interface ProfileModalProps {
@@ -25,14 +26,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
       case 'profile':
         return <ProfileTab />;
       case 'privacy':
-        return (
-          <div className="placeholder-tab">
-            <div className="placeholder-icon">🔒</div>
-            <h3>Privacy Settings</h3>
-            <p>Manage your data visibility and privacy preferences.</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '8px' }}>(Coming Soon)</p>
-          </div>
-        );
+        return <PrivacyTab />;
       case 'history':
         return (
           <div className="placeholder-tab">

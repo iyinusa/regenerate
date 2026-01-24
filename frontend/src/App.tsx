@@ -12,6 +12,7 @@ function App() {
         <Route path="/regen" element={<Regen />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/journey/:guestId" element={<Journey />} />
+        <Route path="/:username" element={<Journey />} />
       </Routes>
     </AuthProvider>
   );

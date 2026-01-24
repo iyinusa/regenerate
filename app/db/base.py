@@ -5,7 +5,8 @@ This is used by Alembic for migrations.
 
 from app.db.session import Base
 from app.models.user import User, ProfileHistory
+from app.models.privacy import ProfilePrivacy
 
 # Import all models here to ensure they are registered with SQLAlchemy
 
-__all__ = ["Base", "User", "ProfileHistory"]
+__all__ = ["Base", "User", "ProfileHistory", "ProfilePrivacy"]
