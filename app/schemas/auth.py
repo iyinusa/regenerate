@@ -63,6 +63,12 @@ class OAuthLinkSchema(BaseModel):
     redirect_url: str = Field(..., description="OAuth authorization URL")
 
 
+class UserUpdateSchema(BaseModel):
+    """Schema for user profile update."""
+    full_name: Optional[str] = Field(None, max_length=255, description="Full name")
+    email: Optional[EmailStr] = Field(None, description="Email address")
+
+
 class PasswordChangeSchema(BaseModel):
     """Schema for password change."""
     current_password: str = Field(..., description="Current password")

@@ -11,6 +11,7 @@ import SkillsSection from '@/components/journey/SkillsSection';
 import ProjectsSection from '@/components/journey/ProjectsSection';
 import DocumentarySection from '@/components/journey/DocumentarySection';
 import AuthModal from '@/components/AuthModal';
+import ProfileModal from '@/components/profile/ProfileModal';
 import './Journey.css';
 
 interface ProfileData {
@@ -68,6 +69,7 @@ const Journey: React.FC = () => {
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -235,6 +237,43 @@ const Journey: React.FC = () => {
       )}
       <JourneyBackground activeSection={activeSection} />
       <ImmersiveAudio profile={profile} />
+
+      {/* Profile Menu Button */}
+      {isAuthenticated && (
+        <button 
+          className="profile-menu-btn"
+          onClick={() => setShowProfileModal(true)}
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '20px',
+            zIndex: 100,
+            background: 'rgba(20, 20, 25, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '50%',
+            width: '44px',
+            height: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: 'white',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(20, 20, 25, 0.6)'}
+          aria-label="Open Settings"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      )}
+
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
       
       <div className="journey-content">
         {/* Hero Section */}

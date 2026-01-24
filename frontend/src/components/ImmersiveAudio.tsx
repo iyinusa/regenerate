@@ -136,8 +136,8 @@ const ImmersiveAudio: React.FC<ImmersiveAudioProps> = ({ profile }) => {
           isPlaying ? "Mute Cinematic Sound" : "Enable Cinematic Sound"
         }
         style={{
-          width: '50px',
-          height: '50px',
+          width: '44px',
+          height: '44px',
           borderRadius: '50%',
           backgroundColor: audioError ? 'rgba(128, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.6)',
           border: audioError ? '1px solid #ff4444' : '1px solid #00d4ff',
@@ -162,7 +162,7 @@ const ImmersiveAudio: React.FC<ImmersiveAudioProps> = ({ profile }) => {
       >
         {!audioLoaded && !audioError ? (
           // Loading spinner
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" opacity="0.3"/>
             <path d="M12 2a10 10 0 0 1 10 10" strokeDasharray="31.416" strokeDashoffset="31.416">
               <animate attributeName="stroke-dashoffset" dur="1s" values="31.416;0" repeatCount="indefinite"/>

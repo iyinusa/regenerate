@@ -30,7 +30,8 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     UserRegistrationSchema, UserLoginSchema, TokenSchema, TokenRefreshSchema,
-    UserProfileSchema, AuthStatusSchema, OAuthLinkSchema, PasswordChangeSchema
+    UserProfileSchema, AuthStatusSchema, OAuthLinkSchema, PasswordChangeSchema,
+    UserUpdateSchema
 )
 
 logger = logging.getLogger(__name__)
@@ -286,6 +287,60 @@ async def get_auth_status(
         authenticated=False,
         guest_id=guest_id,
         user=None
+    )
+
+
+@router.put(
+    "/profile",
+    response_model=UserProfileSchema,
+    summary="Update User Profile",
+    description="Update user profile information (requires authentication)."
+)
+async def update_user_profile(
+    user_data: UserUpdateSchema,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update user profile."""
+    
+    # If email is being changed, check if it's already taken
+    if user_data.email and user_data.email != current_user.email:
+        result = await db.execute(
+            select(User).where(User.email == user_data.email)
+        )
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+    
+    update_data = user_data.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data provided for update"
+        )
+        
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(**update_data)
+    )
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return UserProfileSchema(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+        created_at=current_user.created_at,
+        github_connected=bool(current_user.github_access_token),
+        linkedin_connected=bool(current_user.linkedin_access_token),
+        github_username=current_user.github_username
     )
 
 
