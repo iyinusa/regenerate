@@ -9,9 +9,16 @@ interface ProjectsSectionProps {
   achievements?: any[];
   sectionIndex: number;
   historyId?: string; // For editing functionality
+  onRequestEdit?: (action: string, callback: () => void) => void;
 }
 
-const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProjects, achievements = [], sectionIndex, historyId }) => {
+const ProjectsSection: React.FC<ProjectsSectionProps> = ({ 
+  projects: initialProjects, 
+  achievements = [], 
+  sectionIndex, 
+  historyId,
+  onRequestEdit
+}) => {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [projects, setProjects] = useState(initialProjects || []);
@@ -39,8 +46,16 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects: initialProj
 
   // Handler to open edit modal
   const handleOpenEditModal = () => {
-    setIsEditModalOpen(true);
-    setSelectedProject(null); // Close any open project detail
+    const openModal = () => {
+      setIsEditModalOpen(true);
+      setSelectedProject(null); // Close any open project detail
+    };
+    
+    if (onRequestEdit) {
+      onRequestEdit('edit projects', openModal);
+    } else {
+      openModal();
+    }
   };
 
   // Projects carousel navigation

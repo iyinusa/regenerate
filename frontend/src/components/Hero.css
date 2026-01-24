@@ -6,7 +6,7 @@
 	justify-content: center;
 	padding: 2rem;
 	overflow: hidden;
-	font-family: var(--font-mono);
+	font-family: 'Nunito Sans', sans-serif;
 }
 
 .hero-container {
@@ -14,6 +14,156 @@
 	z-index: 10;
 	width: 100%;
 	max-width: 1000px;
+}
+
+/* Ensure hero content is visible by default */
+.hero-content > * {
+	opacity: 1;
+}
+
+/* Authentication Section */
+.auth-section {
+	position: absolute;
+	top: 2rem;
+	right: 2rem;
+	z-index: 20;
+}
+
+.auth-buttons {
+	display: flex;
+	gap: 1rem;
+}
+
+.auth-btn {
+	padding: 0.85rem 1.75rem;
+	border-radius: 12px;
+	font-size: 0.95rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	backdrop-filter: blur(10px);
+}
+
+.login-btn {
+	background: rgba(255, 255, 255, 0.05);
+	color: #fff;
+}
+
+.login-btn:hover {
+	background: rgba(255, 255, 255, 0.1);
+	border-color: rgba(255, 255, 255, 0.3);
+	transform: translateY(-2px);
+	box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.3);
+}
+
+.user-menu {
+	background: rgba(18, 18, 24, 0.8);
+	backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 16px;
+	padding: 0.75rem 1rem;
+	min-width: 220px;
+	box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+	transition: all 0.3s ease;
+}
+
+.user-menu:hover {
+	background: rgba(18, 18, 24, 0.9);
+	border-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-info {
+	color: #fff;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.user-name {
+	font-size: 1rem;
+	font-weight: 700;
+	color: #fff;
+	display: flex;
+	align-items: center;
+	padding: 0.25rem 0.5rem;
+	border-radius: 8px;
+	transition: background 0.2s;
+}
+
+.user-name:hover {
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--accent-blue);
+}
+
+.connected-badges {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	padding: 0 0.5rem;
+}
+
+.badge {
+	font-size: 0.7rem;
+	padding: 0.25rem 0.6rem;
+	border-radius: 6px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.badge.github {
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: #e0e0e0;
+}
+
+.badge.linkedin {
+	background: rgba(0, 119, 181, 0.15);
+	border: 1px solid rgba(0, 119, 181, 0.3);
+	color: #4cb2e6;
+}
+
+.sign-out-btn {
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	padding: 0.25rem 0.5rem;
+	margin-top: 0.25rem;
+	text-align: left;
+	cursor: pointer;
+	transition: color 0.2s;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.sign-out-btn:hover {
+	color: #ff5f56;
+}
+
+/* Responsive adjustments for auth section */
+@media (max-width: 768px) {
+	.auth-section {
+		top: 1rem;
+		right: 1rem;
+	}
+	
+	.auth-buttons {
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	
+	.auth-btn {
+		padding: 0.5rem 1rem;
+		font-size: 0.85rem;
+	}
+	
+	.user-menu {
+		min-width: 160px;
+		padding: 0.75rem;
+	}
 }
 
 .terminal-badge {
@@ -46,6 +196,7 @@
 	font-size: clamp(3rem, 7vw, 5rem);
 	font-weight: 900;
 	line-height: 0.9;
+	margin-top: 3rem;
 	margin-bottom: 3rem;
 	color: #fff;
 	letter-spacing: -0.05em;
@@ -64,6 +215,7 @@
 	line-height: 1.4;
 	color: rgba(255, 255, 255, 0.6);
 	max-width: 700px;
+	margin-top: 6rem;
 	margin-bottom: 6rem;
 	font-weight: 400;
 }
@@ -91,7 +243,7 @@
 	align-items: center;
 	gap: 0.5rem;
 	padding-left: 1.5rem;
-	font-family: var(--font-mono);
+	font-family: 'Nunito Sans', sans-serif;
 }
 
 .prompt-user { color: var(--accent-blue); font-weight: 700; }
@@ -253,7 +405,7 @@
 }
 
 .card-icon {
-	font-family: var(--font-mono);
+	font-family: 'Nunito Sans', sans-serif;
 	font-size: 0.8rem;
 	color: var(--accent-blue);
 	margin-bottom: 1rem;

@@ -18,6 +18,8 @@ from app.schemas.profile import (
 from app.services.profile_service import profile_service
 from app.services.task_orchestrator import task_orchestrator
 from app.db.session import get_db
+from app.core.dependencies import get_current_user_required
+from app.models.user import User
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -337,7 +339,8 @@ async def get_journey_by_guest_id(
 async def update_timeline_events(
     history_id: str,
     timeline_events: List[Dict[str, Any]],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Update timeline events for a specific profile history.
     
@@ -348,6 +351,7 @@ async def update_timeline_events(
         history_id: The profile history identifier
         timeline_events: Updated list of timeline events
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Updated timeline data
@@ -367,6 +371,13 @@ async def update_timeline_events(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data or create new
@@ -413,7 +424,8 @@ async def update_timeline_events(
 async def add_timeline_event(
     history_id: str,
     event_data: Dict[str, Any],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Add a new timeline event.
     
@@ -421,6 +433,7 @@ async def add_timeline_event(
         history_id: The profile history identifier
         event_data: New event data to add
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated timeline
@@ -441,6 +454,13 @@ async def add_timeline_event(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data or create new
@@ -492,7 +512,8 @@ async def add_timeline_event(
 async def delete_timeline_event(
     history_id: str,
     event_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Delete a timeline event.
     
@@ -500,6 +521,7 @@ async def delete_timeline_event(
         history_id: The profile history identifier
         event_id: The event identifier to delete
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated timeline
@@ -519,6 +541,13 @@ async def delete_timeline_event(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data
@@ -651,7 +680,8 @@ async def update_experiences(
 async def add_experience(
     history_id: str,
     experience_data: Dict[str, Any],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Add a new professional experience.
     
@@ -659,6 +689,7 @@ async def add_experience(
         history_id: The profile history identifier
         experience_data: New experience data to add
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated experiences
@@ -679,6 +710,13 @@ async def add_experience(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data or create new
@@ -728,7 +766,8 @@ async def add_experience(
 async def delete_experience(
     history_id: str,
     experience_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Delete a professional experience.
     
@@ -736,6 +775,7 @@ async def delete_experience(
         history_id: The profile history identifier
         experience_id: The experience identifier to delete
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated experiences
@@ -755,6 +795,13 @@ async def delete_experience(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data
@@ -814,7 +861,8 @@ async def delete_experience(
 async def update_projects(
     history_id: str,
     projects: List[Dict[str, Any]],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Update projects for a specific profile history.
     
@@ -825,6 +873,7 @@ async def update_projects(
         history_id: The profile history identifier
         projects: Updated list of projects
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Updated projects data
@@ -844,6 +893,13 @@ async def update_projects(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data or create new
@@ -887,7 +943,8 @@ async def update_projects(
 async def add_project(
     history_id: str,
     project_data: Dict[str, Any],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Add a new project.
     
@@ -895,6 +952,7 @@ async def add_project(
         history_id: The profile history identifier
         project_data: New project data to add
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated projects
@@ -915,6 +973,13 @@ async def add_project(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data or create new
@@ -964,7 +1029,8 @@ async def add_project(
 async def delete_project(
     history_id: str,
     project_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Delete a project.
     
@@ -972,6 +1038,7 @@ async def delete_project(
         history_id: The profile history identifier
         project_id: The project identifier to delete
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Success response with updated projects
@@ -991,6 +1058,13 @@ async def delete_project(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+            
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Get existing structured data
@@ -1050,7 +1124,8 @@ async def delete_project(
 async def update_documentary(
     history_id: str,
     documentary: Dict[str, Any],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ) -> Dict[str, Any]:
     """Update documentary for a specific profile history.
     
@@ -1061,6 +1136,7 @@ async def update_documentary(
         history_id: The profile history identifier
         documentary: Updated documentary data
         db: Database session
+        current_user: The authenticated user
         
     Returns:
         Updated documentary data
@@ -1082,6 +1158,13 @@ async def update_documentary(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
+            )
+
+        # Check ownership
+        if history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this journey"
             )
         
         # Update the documentary data

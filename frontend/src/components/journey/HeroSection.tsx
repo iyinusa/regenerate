@@ -16,6 +16,7 @@ interface HeroSectionProps {
   onDocumentaryUpdate?: (updatedDocumentary: any) => void;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
+  onRequestEdit?: (action: string, callback: () => void) => void;
 }
 
 const HeroSection: React.FC<HeroSectionProps> = ({
@@ -28,7 +29,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   historyId,
   onDocumentaryUpdate,
   onGenerateVideo,
-  onRegenerateVideo
+  onRegenerateVideo,
+  onRequestEdit
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
@@ -37,7 +39,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   const [editedDocumentary, setEditedDocumentary] = useState(documentary);
   
   const handleEditDocumentary = () => {
-    setShowEditModal(true);
+    if (onRequestEdit) {
+      onRequestEdit('edit documentary', () => setShowEditModal(true));
+    } else {
+      setShowEditModal(true);
+    }
   };
 
   const handleSaveDocumentary = async (updatedDocumentary: any) => {
@@ -176,12 +182,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 full_video: fullVideo
               }}
               onGenerateVideo={() => {
-                // TODO: Implement video generation logic
-                console.log('Generate documentary video');
+                if (onGenerateVideo) {
+                    onGenerateVideo();
+                } else {
+                    console.log('Generate documentary video');
+                }
               }}
               onRegenerateVideo={() => {
-                // TODO: Implement video regeneration logic
-                console.log('Regenerate documentary video');
+                if (onRegenerateVideo) {
+                    onRegenerateVideo();
+                } else {
+                    console.log('Regenerate documentary video');
+                }
               }}
               onEditDocumentary={handleEditDocumentary}
             />

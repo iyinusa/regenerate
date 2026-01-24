@@ -1,23 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { TextPlugin } from 'gsap/TextPlugin';
 import { apiClient } from '@/lib/api.ts';
+import { useAuth } from '@/hooks/useAuth';
+import AuthModal from './AuthModal';
 import './Hero.css';
 
 gsap.registerPlugin(TextPlugin);
 
 interface HeroProps {
   onGenerate: (data: { url: string; jobId?: string; status?: string }) => void;
-}
-
-// Helper to get guest ID
-function getGuestId(): string {
-  let id = localStorage.getItem('rg_guest_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem('rg_guest_id', id);
-  }
-  return id;
 }
 
 const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
@@ -27,9 +20,16 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
   const ctaRef = useRef<HTMLDivElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  const navigate = useNavigate();
+  const { user, isAuthenticated, guestId, loading: authLoading, logout } = useAuth();
+
   const [isLoading, setIsLoading] = useState(false);
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [suggestRegister, setSuggestRegister] = useState(false);
+  const [oauthInfo, setOauthInfo] = useState<{ provider?: 'github' | 'linkedin'; username?: string }>({});
   const [oauthStatus, setOauthStatus] = useState<{
     github: { connected: boolean; username?: string };
     linkedin: { connected: boolean; expired?: boolean };
@@ -44,18 +44,10 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
       .then(() => console.log('API connection established'))
       .catch((err) => console.warn('API connection failed:', err));
 
-    // Check OAuth status
-    const guestId = getGuestId();
-    apiClient.getOAuthStatus(guestId)
-      .then((status: { user_found: boolean; github: { connected: boolean; username?: string }; linkedin: { connected: boolean; expired?: boolean } }) => {
-        if (status.user_found) {
-          setOauthStatus({
-            github: status.github,
-            linkedin: status.linkedin
-          });
-        }
-      })
-      .catch((err: Error) => console.warn('OAuth status check failed:', err));
+    // Load OAuth status when auth is ready
+    if (!authLoading && (isAuthenticated || guestId)) {
+      loadOAuthStatus();
+    }
 
     // Check URL params for OAuth callbacks
     const urlParams = new URLSearchParams(window.location.search);
@@ -65,6 +57,14 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
         ...prev,
         github: { connected: true, username: username || undefined }
       }));
+      setOauthInfo({ provider: 'github', username: username || undefined });
+      
+      if (urlParams.get('suggest_register') === 'true' && !isAuthenticated) {
+        setSuggestRegister(true);
+        setAuthModalMode('register');
+        setShowAuthModal(true);
+      }
+      
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -73,6 +73,14 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
         ...prev,
         linkedin: { connected: true }
       }));
+      setOauthInfo({ provider: 'linkedin' });
+      
+      if (urlParams.get('suggest_register') === 'true' && !isAuthenticated) {
+        setSuggestRegister(true);
+        setAuthModalMode('register');
+        setShowAuthModal(true);
+      }
+      
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -84,49 +92,46 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
     // GSAP animations on mount
     const tl = gsap.timeline();
     
+    // Set initial state first to ensure elements are visible if animation fails
+    gsap.set(".hero-content > *", { opacity: 1, y: 0 });
+    gsap.set(".feature-card", { opacity: 1, y: 0 });
+    
     // entrance animation
-    tl.from(".hero-content > *", {
-      y: 100,
-      opacity: 0,
-      duration: 1.2,
-      stagger: 0.2,
-      ease: "power4.out"
-    })
-    .from(".feature-card", {
-      opacity: 0,
-      y: 50,
-      stagger: 0.1,
-      duration: 1,
-      ease: "power3.out"
-    }, "-=0.8");
-
-    // Floating animation for decorative elements
-    gsap.to(".floating-decoration", {
-      y: -30,
-      x: 20,
-      duration: 4,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut"
-    });
-
-    // Mouse move effect for title
-    const handleMouseMove = (e: MouseEvent) => {
-      const { clientX, clientY } = e;
-      const xPos = (clientX / window.innerWidth - 0.5) * 20;
-      const yPos = (clientY / window.innerHeight - 0.5) * 20;
-      
-      gsap.to(".mhero-title", {
-        x: xPos,
-        y: yPos,
+    tl.fromTo(".hero-content > *", 
+      { y: 100, opacity: 0 },
+      { 
+        y: 0,
+        opacity: 1,
+        duration: 1.2,
+        stagger: 0.2,
+        ease: "power4.out"
+      }
+    )
+    .fromTo(".feature-card", 
+      { opacity: 0, y: 50 },
+      {
+        opacity: 1,
+        y: 0,
+        stagger: 0.1,
         duration: 1,
-        ease: "power2.out"
-      });
-    };
+        ease: "power3.out"
+      }, "-=0.5");
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [authLoading, isAuthenticated, guestId]);
+
+  const loadOAuthStatus = async () => {
+    try {
+      const status = await apiClient.getOAuthStatus(isAuthenticated ? undefined : guestId);
+      if (status.user_found) {
+        setOauthStatus({
+          github: status.github,
+          linkedin: status.linkedin
+        });
+      }
+    } catch (err: any) {
+      console.warn('OAuth status check failed:', err);
+    }
+  };
 
   async function handleGenerate() {
     if (!url.trim()) return;
@@ -157,8 +162,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
 
   async function handleGitHubOAuth() {
     try {
-      const guestId = getGuestId();
-      const authUrl = await apiClient.githubOAuth(guestId);
+      const authUrl = await apiClient.githubOAuth(isAuthenticated ? undefined : guestId);
       window.location.href = authUrl.redirect_url;
     } catch (err) {
       console.error('GitHub OAuth failed:', err);
@@ -168,8 +172,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
 
   async function handleLinkedInOAuth() {
     try {
-      const guestId = getGuestId();
-      const authUrl = await apiClient.linkedinOAuth(guestId);
+      const authUrl = await apiClient.linkedinOAuth(isAuthenticated ? undefined : guestId);
       window.location.href = authUrl.redirect_url;
     } catch (err) {
       console.error('LinkedIn OAuth failed:', err);
@@ -183,9 +186,83 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
     }
   }
 
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  }
+
+  function handleUsernameClick() {
+    if (guestId) {
+      navigate(`/journey/${guestId}`);
+    } else if (user?.username) {
+      navigate(`/journey/${user.username}`);
+    }
+  }
+
   return (
     <section className="hero" ref={heroRef}>
       <div className="hero-container">
+        {/* Auth Modal */}
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          initialMode={authModalMode}
+          suggestRegister={suggestRegister}
+          oauthInfo={oauthInfo}
+        />
+
+        {/* User Authentication UI */}
+        <div className="auth-section">
+          {isAuthenticated ? (
+            <div className="user-menu">
+              <div className="user-info">
+                <span 
+                  className="user-name" 
+                  onClick={handleUsernameClick}
+                  style={{ cursor: 'pointer' }}
+                  title="View your journey"
+                >
+                  {user?.full_name || user?.username || 'User'}
+                </span>
+                {(user?.github_connected || user?.linkedin_connected) && (
+                  <div className="connected-badges">
+                    {user.github_connected && (
+                      <span className="badge github">GitHub</span>
+                    )}
+                    {user.linkedin_connected && (
+                      <span className="badge linkedin">LinkedIn</span>
+                    )}
+                  </div>
+                )}
+                <button 
+                  className="sign-out-btn"
+                  onClick={handleLogout}
+                  title="Sign out"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="auth-buttons">
+              <button 
+                className="auth-btn login-btn"
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setSuggestRegister(false);
+                  setOauthInfo({});
+                  setShowAuthModal(true);
+                }}
+              >
+                Sign In
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Decorative Background Elements */}
         <div className="glow-orb top-left floating-decoration"></div>
         <div className="glow-orb bottom-right floating-decoration" style={{ animationDelay: '-1.25s' }}></div>
@@ -305,7 +382,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
             <div className="feature-card">
               <div className="card-icon">// REGEN</div>
               <h3>CINEMATIC JOURNEY</h3>
-              <p>Constructs an immersive, shareable narrative that tells your story better than you can.</p>
+              <p>Constructs an immersive, shareable narrative that tells your story better than just a resume.</p>
             </div>
           </div>
         </div>

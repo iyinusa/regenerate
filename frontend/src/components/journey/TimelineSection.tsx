@@ -12,9 +12,16 @@ interface TimelineSectionProps {
   journey: any;
   sectionIndex: number;
   historyId?: string; // For editing functionality
+  onRequestEdit?: (action: string, callback: () => void) => void;
 }
 
-const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _journey, sectionIndex: _sectionIndex, historyId }) => {
+const TimelineSection: React.FC<TimelineSectionProps> = ({ 
+  timeline, 
+  journey: _journey, 
+  sectionIndex: _sectionIndex, 
+  historyId,
+  onRequestEdit
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -52,8 +59,16 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({ timeline, journey: _j
 
   // Handler to open edit modal
   const handleOpenEditModal = () => {
-    setIsEditModalOpen(true);
-    setActiveEvent(null); // Close any open event popup
+    const openModal = () => {
+      setIsEditModalOpen(true);
+      setActiveEvent(null); // Close any open event popup
+    };
+
+    if (onRequestEdit) {
+      onRequestEdit('edit chronicles', openModal);
+    } else {
+      openModal();
+    }
   };
 
   useEffect(() => {

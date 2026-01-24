@@ -10,9 +10,16 @@ interface ExperienceSectionProps {
   journey: any;
   sectionIndex: number;
   historyId?: string; // For editing functionality
+  onRequestEdit?: (action: string, callback: () => void) => void;
 }
 
-const ExperienceSection: React.FC<ExperienceSectionProps> = ({ experiences: initialExperiences, journey, sectionIndex, historyId }) => {
+const ExperienceSection: React.FC<ExperienceSectionProps> = ({ 
+  experiences: initialExperiences, 
+  journey, 
+  sectionIndex, 
+  historyId,
+  onRequestEdit 
+}) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [experiences, setExperiences] = useState(initialExperiences || []);
@@ -34,9 +41,17 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({ experiences: init
 
   // Handler to open edit modal
   const handleOpenEditModal = () => {
-    console.log('Opening edit modal, experiences:', experiences);
-    console.log('Is experiences an array?', Array.isArray(experiences));
-    setIsEditModalOpen(true);
+    const openModal = () => {
+      console.log('Opening edit modal, experiences:', experiences);
+      console.log('Is experiences an array?', Array.isArray(experiences));
+      setIsEditModalOpen(true);
+    };
+
+    if (onRequestEdit) {
+      onRequestEdit('edit experiences', openModal);
+    } else {
+      openModal();
+    }
   };
 
   return (

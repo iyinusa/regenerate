@@ -1,7 +1,10 @@
-"""OAuth Authentication Routes for GitHub and LinkedIn.
+"""Authentication Routes for Username/Password and OAuth.
 
-This module handles OAuth 2.0 authentication flows for both GitHub and LinkedIn,
-enabling enhanced profile data extraction and enrichment.
+This module handles comprehensive authentication including:
+- Username/password registration and login with JWT tokens
+- OAuth 2.0 authentication flows for GitHub and LinkedIn
+- Token refresh and user session management
+- Profile data extraction and enrichment
 """
 
 import logging
@@ -9,16 +12,26 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
+import uuid
 
 import httpx
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Header
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 
 from app.core.config import settings
+from app.core.security import (
+    create_access_token, create_refresh_token, 
+    get_password_hash, verify_password
+)
+from app.core.dependencies import get_current_user, get_current_user_required, verify_refresh_token
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.auth import (
+    UserRegistrationSchema, UserLoginSchema, TokenSchema, TokenRefreshSchema,
+    UserProfileSchema, AuthStatusSchema, OAuthLinkSchema, PasswordChangeSchema
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +42,309 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 _oauth_states: Dict[str, Dict[str, Any]] = {}
 
 
-def generate_oauth_state(guest_id: str, provider: str) -> str:
+# Helper functions
+def get_guest_id_from_request(guest_id_header: Optional[str] = None) -> str:
+    """Get or generate guest ID from request."""
+    if guest_id_header:
+        return guest_id_header
+    return str(uuid.uuid4())
+
+
+async def create_user_tokens(user: User, db: AsyncSession) -> TokenSchema:
+    """Create access and refresh tokens for user."""
+    token_data = {"sub": user.id, "email": user.email, "username": user.username}
+    
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token({"sub": user.id})
+    
+    # Store refresh token in database
+    await db.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(refresh_token=refresh_token)
+    )
+    await db.commit()
+    
+    return TokenSchema(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=settings.access_token_expires_min * 60
+    )
+
+
+# =============================================================================
+# Username/Password Authentication
+# =============================================================================
+
+@router.post(
+    "/register",
+    response_model=TokenSchema,
+    summary="Register New User",
+    description="Register a new user account with username, email and password. Username will be used for profile URLs."
+)
+async def register_user(
+    user_data: UserRegistrationSchema,
+    x_guest_id: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Register a new user account."""
+    
+    # Check if username or email already exists
+    result = await db.execute(
+        select(User).where(
+            or_(User.username == user_data.username, User.email == user_data.email)
+        )
+    )
+    existing_user = result.scalar_one_or_none()
+    
+    if existing_user:
+        if existing_user.username == user_data.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+    
+    # Get or generate guest ID
+    guest_id = get_guest_id_from_request(x_guest_id)
+    
+    # Check if guest user exists and update it
+    result = await db.execute(select(User).where(User.guest_id == guest_id))
+    user = result.scalar_one_or_none()
+    
+    password_hash = get_password_hash(user_data.password)
+    
+    if user:
+        # Update existing guest user with registration data
+        await db.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(
+                username=user_data.username,
+                email=user_data.email,
+                full_name=user_data.full_name,
+                password_hash=password_hash,
+                is_verified=True
+            )
+        )
+        await db.commit()
+        
+        # Refresh user object
+        await db.refresh(user)
+    else:
+        # Create new user
+        user = User(
+            guest_id=guest_id,
+            username=user_data.username,
+            email=user_data.email,
+            full_name=user_data.full_name,
+            password_hash=password_hash,
+            is_verified=True
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    
+    return await create_user_tokens(user, db)
+
+
+@router.post(
+    "/login",
+    response_model=TokenSchema,
+    summary="User Login",
+    description="Login with email and password."
+)
+async def login_user(
+    credentials: UserLoginSchema,
+    db: AsyncSession = Depends(get_db)
+):
+    """Login user with email and password."""
+    
+    # Find user by email
+    result = await db.execute(
+        select(User).where(User.email == credentials.email)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+    
+    if not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive"
+        )
+    
+    return await create_user_tokens(user, db)
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenSchema,
+    summary="Refresh Access Token",
+    description="Refresh access token using refresh token."
+)
+async def refresh_token(
+    token_data: TokenRefreshSchema,
+    db: AsyncSession = Depends(get_db)
+):
+    """Refresh access token."""
+    user = await verify_refresh_token(token_data.refresh_token, db)
+    return await create_user_tokens(user, db)
+
+
+@router.post(
+    "/logout",
+    summary="User Logout",
+    description="Logout user and invalidate refresh token."
+)
+async def logout_user(
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """Logout user and invalidate refresh token."""
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(refresh_token=None)
+    )
+    await db.commit()
+    
+    return {"message": "Successfully logged out"}
+
+
+@router.get(
+    "/me",
+    response_model=UserProfileSchema,
+    summary="Get Current User",
+    description="Get current authenticated user profile."
+)
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user_required)
+):
+    """Get current user profile."""
+    return UserProfileSchema(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+        created_at=current_user.created_at,
+        github_connected=bool(current_user.github_access_token),
+        linkedin_connected=bool(current_user.linkedin_access_token),
+        github_username=current_user.github_username
+    )
+
+
+@router.get(
+    "/status",
+    response_model=AuthStatusSchema,
+    summary="Get Authentication Status",
+    description="Get current authentication status and user information."
+)
+async def get_auth_status(
+    x_guest_id: Optional[str] = Header(None),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """Get authentication status."""
+    guest_id = get_guest_id_from_request(x_guest_id)
+    
+    if current_user:
+        return AuthStatusSchema(
+            authenticated=True,
+            guest_id=current_user.guest_id,
+            user=UserProfileSchema(
+                id=current_user.id,
+                username=current_user.username,
+                email=current_user.email,
+                full_name=current_user.full_name,
+                is_active=current_user.is_active,
+                is_verified=current_user.is_verified,
+                created_at=current_user.created_at,
+                github_connected=bool(current_user.github_access_token),
+                linkedin_connected=bool(current_user.linkedin_access_token),
+                github_username=current_user.github_username
+            )
+        )
+    
+    return AuthStatusSchema(
+        authenticated=False,
+        guest_id=guest_id,
+        user=None
+    )
+
+
+@router.post(
+    "/change-password",
+    summary="Change Password",
+    description="Change user password (requires authentication)."
+)
+async def change_password(
+    password_data: PasswordChangeSchema,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """Change user password."""
+    if not current_user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No password set for this account"
+        )
+    
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    new_password_hash = get_password_hash(password_data.new_password)
+    
+    await db.execute(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(password_hash=new_password_hash, refresh_token=None)  # Invalidate all tokens
+    )
+    await db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+# =============================================================================
+# OAuth Integration
+# =============================================================================
+
+
+def generate_oauth_state(identifier: str, provider: str, user_type: str = "guest") -> str:
     """Generate a secure OAuth state parameter.
     
     Args:
-        guest_id: Guest user identifier
+        identifier: User or guest identifier
         provider: OAuth provider name
+        user_type: Type of user (guest, user)
         
     Returns:
         Unique state string
     """
     state = secrets.token_urlsafe(32)
     _oauth_states[state] = {
-        "guest_id": guest_id,
+        "identifier": identifier,
         "provider": provider,
+        "user_type": user_type,
         "created_at": datetime.utcnow(),
     }
     return state
@@ -75,19 +377,18 @@ def verify_oauth_state(state: str) -> Optional[Dict[str, Any]]:
 
 @router.get(
     "/github",
+    response_model=OAuthLinkSchema,
     summary="Initiate GitHub OAuth",
     description="Start the GitHub OAuth flow for repository access and profile enrichment."
 )
 async def github_oauth_start(
-    guest_id: str = Query(..., description="Guest user ID for linking OAuth"),
+    guest_id: Optional[str] = Query(None, description="Guest user ID for linking OAuth (for unauthenticated users)"),
+    x_guest_id: Optional[str] = Header(None),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """Start GitHub OAuth flow.
     
-    Args:
-        guest_id: Guest user ID to link OAuth credentials
-        
-    Returns:
-        Redirect URL for GitHub OAuth
+    Works for both authenticated users and guests.
     """
     if not settings.github_client_id:
         raise HTTPException(
@@ -95,7 +396,13 @@ async def github_oauth_start(
             detail="GitHub OAuth is not configured"
         )
     
-    state = generate_oauth_state(guest_id, "github")
+    if current_user:
+        # Authenticated user
+        state = generate_oauth_state(current_user.id, "github", "user")
+    else:
+        # Guest user
+        identifier = guest_id or get_guest_id_from_request(x_guest_id)
+        state = generate_oauth_state(identifier, "github", "guest")
     
     # GitHub OAuth scopes for profile and repo access
     scopes = "read:user user:email repo read:org"
@@ -110,7 +417,7 @@ async def github_oauth_start(
     
     auth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
     
-    return {"redirect_url": auth_url}
+    return OAuthLinkSchema(provider="github", redirect_url=auth_url)
 
 
 @router.get(
@@ -123,16 +430,8 @@ async def github_oauth_callback(
     state: str = Query(..., description="OAuth state parameter"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle GitHub OAuth callback.
+    """Handle GitHub OAuth callback for both authenticated users and guests."""
     
-    Args:
-        code: Authorization code from GitHub
-        state: OAuth state for verification
-        db: Database session
-        
-    Returns:
-        Redirect to frontend with success/error
-    """
     # Verify state
     state_data = verify_oauth_state(state)
     if not state_data:
@@ -142,7 +441,8 @@ async def github_oauth_callback(
             status_code=status.HTTP_302_FOUND
         )
     
-    guest_id = state_data["guest_id"]
+    identifier = state_data["identifier"]
+    user_type = state_data["user_type"]
     
     try:
         # Exchange code for access token
@@ -196,11 +496,17 @@ async def github_oauth_callback(
             github_user = user_response.json()
             github_id = str(github_user.get("id"))
             github_username = github_user.get("login")
+            full_name = github_user.get("name")
+            email = github_user.get("email")
             
-            # Update user record with GitHub OAuth credentials
-            result = await db.execute(
-                select(User).where(User.guest_id == guest_id)
-            )
+            # Update user record based on user type
+            if user_type == "user":
+                # Authenticated user - update by user ID
+                result = await db.execute(select(User).where(User.id == identifier))
+            else:
+                # Guest user - find or create by guest_id
+                result = await db.execute(select(User).where(User.guest_id == identifier))
+            
             user = result.scalar_one_or_none()
             
             if user:
@@ -212,19 +518,40 @@ async def github_oauth_callback(
                         github_username=github_username,
                         github_access_token=access_token,
                         github_scopes=scopes,
-                        github_token_expires_at=None,  # GitHub tokens don't expire unless revoked
-                        full_name=user.full_name or github_user.get("name"),
-                        email=user.email or github_user.get("email"),
+                        full_name=user.full_name or full_name,
+                        email=user.email or email,
                     )
                 )
                 await db.commit()
                 logger.info(f"Updated user {user.id} with GitHub OAuth credentials")
+            elif user_type == "guest":
+                # Create new user record for guest
+                user = User(
+                    guest_id=identifier,
+                    github_id=github_id,
+                    github_username=github_username,
+                    github_access_token=access_token,
+                    github_scopes=scopes,
+                    full_name=full_name,
+                    email=email,
+                )
+                db.add(user)
+                await db.commit()
+                logger.info(f"Created new user for guest_id: {identifier}")
             else:
-                logger.warning(f"User not found for guest_id: {guest_id}")
+                logger.warning(f"User not found for identifier: {identifier}")
+                return RedirectResponse(
+                    url=f"{settings.base_url}/?error=user_not_found",
+                    status_code=status.HTTP_302_FOUND
+                )
             
-            # Redirect to frontend with success
+            # If this was a guest who now has OAuth, they might want to create an account
+            redirect_params = f"github_connected=true&username={github_username}"
+            if user_type == "guest" and not user.password_hash:
+                redirect_params += "&suggest_register=true"
+            
             return RedirectResponse(
-                url=f"{settings.base_url}/?github_connected=true&username={github_username}",
+                url=f"{settings.base_url}/?{redirect_params}",
                 status_code=status.HTTP_302_FOUND
             )
             
@@ -236,61 +563,24 @@ async def github_oauth_callback(
         )
 
 
-@router.get(
-    "/github/status",
-    summary="Check GitHub OAuth Status",
-    description="Check if a user has connected their GitHub account."
-)
-async def github_oauth_status(
-    guest_id: str = Query(..., description="Guest user ID"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Check GitHub OAuth connection status.
-    
-    Args:
-        guest_id: Guest user ID
-        db: Database session
-        
-    Returns:
-        GitHub connection status
-    """
-    result = await db.execute(
-        select(User).where(User.guest_id == guest_id)
-    )
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        return {"connected": False, "message": "User not found"}
-    
-    if user.github_access_token:
-        return {
-            "connected": True,
-            "username": user.github_username,
-            "scopes": user.github_scopes,
-        }
-    
-    return {"connected": False}
-
-
 # =============================================================================
 # LinkedIn OAuth
 # =============================================================================
 
 @router.get(
     "/linkedin",
+    response_model=OAuthLinkSchema,
     summary="Initiate LinkedIn OAuth",
     description="Start the LinkedIn OAuth flow for profile access."
 )
 async def linkedin_oauth_start(
-    guest_id: str = Query(..., description="Guest user ID for linking OAuth"),
+    guest_id: Optional[str] = Query(None, description="Guest user ID for linking OAuth (for unauthenticated users)"),
+    x_guest_id: Optional[str] = Header(None),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """Start LinkedIn OAuth flow.
     
-    Args:
-        guest_id: Guest user ID to link OAuth credentials
-        
-    Returns:
-        Redirect URL for LinkedIn OAuth
+    Works for both authenticated users and guests.
     """
     if not settings.linkedin_client_id:
         raise HTTPException(
@@ -298,7 +588,13 @@ async def linkedin_oauth_start(
             detail="LinkedIn OAuth is not configured"
         )
     
-    state = generate_oauth_state(guest_id, "linkedin")
+    if current_user:
+        # Authenticated user
+        state = generate_oauth_state(current_user.id, "linkedin", "user")
+    else:
+        # Guest user
+        identifier = guest_id or get_guest_id_from_request(x_guest_id)
+        state = generate_oauth_state(identifier, "linkedin", "guest")
     
     # LinkedIn OAuth scopes
     scopes = "openid profile email"
@@ -313,7 +609,7 @@ async def linkedin_oauth_start(
     
     auth_url = f"https://www.linkedin.com/oauth/v2/authorization?{urlencode(params)}"
     
-    return {"redirect_url": auth_url}
+    return OAuthLinkSchema(provider="linkedin", redirect_url=auth_url)
 
 
 @router.get(
@@ -326,16 +622,8 @@ async def linkedin_oauth_callback(
     state: str = Query(..., description="OAuth state parameter"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle LinkedIn OAuth callback.
+    """Handle LinkedIn OAuth callback for both authenticated users and guests."""
     
-    Args:
-        code: Authorization code from LinkedIn
-        state: OAuth state for verification
-        db: Database session
-        
-    Returns:
-        Redirect to frontend with success/error
-    """
     # Verify state
     state_data = verify_oauth_state(state)
     if not state_data:
@@ -345,7 +633,8 @@ async def linkedin_oauth_callback(
             status_code=status.HTTP_302_FOUND
         )
     
-    guest_id = state_data["guest_id"]
+    identifier = state_data["identifier"]
+    user_type = state_data["user_type"]
     
     try:
         # Exchange code for access token
@@ -385,9 +674,7 @@ async def linkedin_oauth_callback(
             # Fetch LinkedIn user info using OpenID
             userinfo_response = await client.get(
                 "https://api.linkedin.com/v2/userinfo",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                }
+                headers={"Authorization": f"Bearer {access_token}"}
             )
             
             if userinfo_response.status_code != 200:
@@ -402,10 +689,14 @@ async def linkedin_oauth_callback(
             full_name = linkedin_user.get("name")
             email = linkedin_user.get("email")
             
-            # Update user record with LinkedIn OAuth credentials
-            result = await db.execute(
-                select(User).where(User.guest_id == guest_id)
-            )
+            # Update user record based on user type
+            if user_type == "user":
+                # Authenticated user - update by user ID
+                result = await db.execute(select(User).where(User.id == identifier))
+            else:
+                # Guest user - find or create by guest_id
+                result = await db.execute(select(User).where(User.guest_id == identifier))
+            
             user = result.scalar_one_or_none()
             
             if user:
@@ -422,15 +713,35 @@ async def linkedin_oauth_callback(
                 )
                 await db.commit()
                 logger.info(f"Updated user {user.id} with LinkedIn OAuth credentials")
+            elif user_type == "guest":
+                # Create new user record for guest
+                user = User(
+                    guest_id=identifier,
+                    linkedin_id=linkedin_id,
+                    linkedin_access_token=access_token,
+                    linkedin_token_expires_at=token_expires_at,
+                    full_name=full_name,
+                    email=email,
+                )
+                db.add(user)
+                await db.commit()
+                logger.info(f"Created new user for guest_id: {identifier}")
             else:
-                logger.warning(f"User not found for guest_id: {guest_id}")
+                logger.warning(f"User not found for identifier: {identifier}")
+                return RedirectResponse(
+                    url=f"{settings.base_url}/?error=user_not_found",
+                    status_code=status.HTTP_302_FOUND
+                )
             
-            # Redirect to frontend with success
+            # If this was a guest who now has OAuth, they might want to create an account
+            redirect_params = "linkedin_connected=true"
+            if user_type == "guest" and not user.password_hash:
+                redirect_params += "&suggest_register=true"
+            
             return RedirectResponse(
-                url=f"{settings.base_url}/?linkedin_connected=true",
+                url=f"{settings.base_url}/?{redirect_params}",
                 status_code=status.HTTP_302_FOUND
             )
-            
     except Exception as e:
         logger.error(f"LinkedIn OAuth callback error: {e}")
         return RedirectResponse(
@@ -439,28 +750,62 @@ async def linkedin_oauth_callback(
         )
 
 
+# =============================================================================
+# OAuth Status Endpoints (Legacy - for backward compatibility)
+# =============================================================================
+
+@router.get(
+    "/github/status",
+    summary="Check GitHub OAuth Status",
+    description="Check if a user has connected their GitHub account (legacy endpoint)."
+)
+async def github_oauth_status(
+    guest_id: Optional[str] = Query(None, description="Guest user ID"),
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Check GitHub OAuth connection status."""
+    
+    if current_user:
+        user = current_user
+    elif guest_id:
+        result = await db.execute(select(User).where(User.guest_id == guest_id))
+        user = result.scalar_one_or_none()
+    else:
+        return {"connected": False, "message": "No user or guest ID provided"}
+    
+    if not user:
+        return {"connected": False, "message": "User not found"}
+    
+    if user.github_access_token:
+        return {
+            "connected": True,
+            "username": user.github_username,
+            "scopes": user.github_scopes,
+        }
+    
+    return {"connected": False}
+
+
 @router.get(
     "/linkedin/status",
     summary="Check LinkedIn OAuth Status",
-    description="Check if a user has connected their LinkedIn account."
+    description="Check if a user has connected their LinkedIn account (legacy endpoint)."
 )
 async def linkedin_oauth_status(
-    guest_id: str = Query(..., description="Guest user ID"),
+    guest_id: Optional[str] = Query(None, description="Guest user ID"),
+    current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Check LinkedIn OAuth connection status.
+    """Check LinkedIn OAuth connection status."""
     
-    Args:
-        guest_id: Guest user ID
-        db: Database session
-        
-    Returns:
-        LinkedIn connection status
-    """
-    result = await db.execute(
-        select(User).where(User.guest_id == guest_id)
-    )
-    user = result.scalar_one_or_none()
+    if current_user:
+        user = current_user
+    elif guest_id:
+        result = await db.execute(select(User).where(User.guest_id == guest_id))
+        user = result.scalar_one_or_none()
+    else:
+        return {"connected": False, "message": "No user or guest ID provided"}
     
     if not user:
         return {"connected": False, "message": "User not found"}
@@ -481,27 +826,28 @@ async def linkedin_oauth_status(
 
 
 @router.get(
-    "/status",
+    "/oauth/status",
     summary="Get All OAuth Status",
-    description="Get the OAuth connection status for all providers."
+    description="Get the OAuth connection status for all providers (legacy endpoint)."
 )
 async def get_all_oauth_status(
-    guest_id: str = Query(..., description="Guest user ID"),
+    guest_id: Optional[str] = Query(None, description="Guest user ID"),
+    current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get OAuth status for all providers.
+    """Get OAuth status for all providers."""
     
-    Args:
-        guest_id: Guest user ID
-        db: Database session
-        
-    Returns:
-        OAuth status for GitHub and LinkedIn
-    """
-    result = await db.execute(
-        select(User).where(User.guest_id == guest_id)
-    )
-    user = result.scalar_one_or_none()
+    if current_user:
+        user = current_user
+    elif guest_id:
+        result = await db.execute(select(User).where(User.guest_id == guest_id))
+        user = result.scalar_one_or_none()
+    else:
+        return {
+            "github": {"connected": False},
+            "linkedin": {"connected": False},
+            "user_found": False
+        }
     
     if not user:
         return {

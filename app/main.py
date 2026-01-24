@@ -18,6 +18,10 @@ import logging
 # Import routers
 from app.api.routes import api_router
 from app.services.profile_service import profile_service
+from app.core.logging import setup_logging
+
+# Setup logging first
+setup_logging()
 
 # Configure logging
 logger = logging.getLogger(__name__)

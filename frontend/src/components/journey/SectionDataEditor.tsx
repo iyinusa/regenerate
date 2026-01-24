@@ -1,6 +1,7 @@
 import React, { useState, useEffect, KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SectionEditorConfig } from './sectionEditorConfig';
+import { apiClient } from '@/lib/api';
 import './SectionDataEditor.css';
 
 interface SectionDataEditorProps {
@@ -63,18 +64,9 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
     setSuccess(null);
 
     try {
-      // Generic API call - extend apiClient to handle different sections
+      // Use apiClient to handle authentication properly
       const endpoint = `/api/v1/profile/${config.apiPath}/${historyId}`;
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(items)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `Failed to save ${config.itemNamePlural}`);
-      }
+      await apiClient.put(endpoint, items);
 
       setSuccess(`${config.displayName} saved successfully!`);
       onItemsUpdate(items);

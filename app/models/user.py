@@ -13,8 +13,13 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     guest_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    email: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
+    username: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    is_verified: Mapped[bool] = mapped_column(default=False)
+    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

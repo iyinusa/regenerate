@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { apiClient } from '@/lib/api.ts';
+import { useAuth } from '@/hooks/useAuth';
 import JourneyBackground from '@/components/JourneyBackground';
 import ImmersiveAudio from '@/components/ImmersiveAudio';
 import HeroSection from '@/components/journey/HeroSection';
@@ -9,6 +10,7 @@ import ExperienceSection from '@/components/journey/ExperienceSection';
 import SkillsSection from '@/components/journey/SkillsSection';
 import ProjectsSection from '@/components/journey/ProjectsSection';
 import DocumentarySection from '@/components/journey/DocumentarySection';
+import AuthModal from '@/components/AuthModal';
 import './Journey.css';
 
 interface ProfileData {
@@ -54,6 +56,7 @@ interface DocumentaryData {
 const Journey: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { guestId } = useParams();
+  const { isAuthenticated, guestId: currentUserGuestId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -64,9 +67,15 @@ const Journey: React.FC = () => {
   const [fullVideo, setFullVideo] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
   
   const containerRef = useRef<HTMLDivElement>(null);
   const pollTimeoutRef = useRef<number | null>(null);
+
+  // Check if user owns this journey (for editing permissions)
+  // We compare the URL guestId with the authenticated user's guestId
+  const canEdit = isAuthenticated && guestId && currentUserGuestId && guestId === currentUserGuestId;
 
   useEffect(() => {
     // Determine if we're loading by jobId (traditional) or guestId (new format)
@@ -143,6 +152,26 @@ const Journey: React.FC = () => {
     };
   }, [searchParams, guestId]);
 
+  const handleAuthRequired = (action: string) => {
+    setAuthMessage(`Please sign in to ${action.toLowerCase()}`);
+    setShowAuthModal(true);
+  };
+
+  const handleEdit = (action: string, callback: () => void) => {
+    if (!isAuthenticated) {
+      handleAuthRequired(action);
+      return;
+    }
+    
+    if (!canEdit) {
+      setAuthMessage('You can only edit your own journey');
+      setShowAuthModal(true);
+      return;
+    }
+    
+    callback();
+  };
+
   // Intersection observer for scroll animations
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -188,7 +217,22 @@ const Journey: React.FC = () => {
   }
 
   return (
-    <main className="journey-page" ref={containerRef}>
+    <main className="journey-page" ref={containerRef}>      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="login"
+      />
+      
+      {/* Auth message overlay */}
+      {authMessage && (
+        <div className="auth-message-overlay">
+          <div className="auth-message glass">
+            <p>{authMessage}</p>
+            <button className="submit-button" onClick={() => setAuthMessage('')}>Got it</button>
+          </div>
+        </div>
+      )}
       <JourneyBackground activeSection={activeSection} />
       <ImmersiveAudio profile={profile} />
       
@@ -204,13 +248,16 @@ const Journey: React.FC = () => {
           historyId={historyId || undefined}
           onDocumentaryUpdate={setDocumentary}
           onGenerateVideo={() => {
-            // TODO: Implement video generation logic
-            console.log('Generate documentary video');
+            handleEdit('generate video', () => {
+              console.log('Generate documentary video');
+            });
           }}
           onRegenerateVideo={() => {
-            // TODO: Implement video regeneration logic
-            console.log('Regenerate documentary video');
+            handleEdit('regenerate video', () => {
+              console.log('Regenerate documentary video');
+            });
           }}
+          onRequestEdit={handleEdit}
         />
 
         {/* Timeline Section */}
@@ -220,6 +267,7 @@ const Journey: React.FC = () => {
             journey={journey}
             sectionIndex={1}
             historyId={historyId || undefined}
+            onRequestEdit={handleEdit}
           />
         )}
 
@@ -230,6 +278,7 @@ const Journey: React.FC = () => {
             journey={journey}
             sectionIndex={2}
             historyId={historyId || undefined}
+            onRequestEdit={handleEdit}
           />
         )}
 
@@ -240,6 +289,7 @@ const Journey: React.FC = () => {
             achievements={profile.achievements}
             sectionIndex={4}
             historyId={historyId || undefined}
+            onRequestEdit={handleEdit}
           />
         )}
 
