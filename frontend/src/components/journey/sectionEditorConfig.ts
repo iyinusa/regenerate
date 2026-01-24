@@ -377,11 +377,141 @@ export const projectsConfig: SectionEditorConfig = {
   })
 };
 
+// Education Configuration
+export const educationConfig: SectionEditorConfig = {
+  sectionName: 'education',
+  displayName: 'Education',
+  apiPath: 'education',
+  itemName: 'education',
+  itemNamePlural: 'education',
+  fields: [
+    {
+      name: 'institution',
+      label: 'Institution',
+      type: 'text',
+      required: true,
+      placeholder: 'University or School Name...'
+    },
+    {
+      name: 'degree',
+      label: 'Degree',
+      type: 'text',
+      required: true,
+      placeholder: 'e.g., Bachelor of Science'
+    },
+    {
+      name: 'field',
+      label: 'Field',
+      type: 'text',
+      required: true,
+      placeholder: 'e.g., Computer Science'
+    },
+    {
+      name: 'start_date',
+      label: 'Start Date',
+      type: 'text',
+      placeholder: 'YYYY-MM'
+    },
+    {
+      name: 'end_date',
+      label: 'End Date',
+      type: 'text',
+      placeholder: 'YYYY-MM or Present'
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      placeholder: 'Description of studies...',
+      rows: 3
+    }
+  ],
+  getItemTitle: (item) => item.institution,
+  getItemSubtitle: (item) => `${item.degree} in ${item.field}`,
+  getItemDescription: (item) => item.description,
+  getItemBadge: (item) => ({
+    text: item.end_date ? item.end_date.substring(0, 4) : 'Present',
+    color: '#00CC66'
+  }),
+  createEmptyItem: () => ({
+    id: '',
+    institution: '',
+    degree: '',
+    field: '',
+    start_date: '',
+    end_date: '',
+    description: ''
+  }),
+  sortItems: (items) => items.sort((a, b) => {
+    const dateA = a.end_date || '9999';
+    const dateB = b.end_date || '9999';
+    return dateB.localeCompare(dateA);
+  })
+};
+
+// Certifications Configuration
+export const certificationsConfig: SectionEditorConfig = {
+  sectionName: 'certifications',
+  displayName: 'Certifications',
+  apiPath: 'certifications',
+  itemName: 'certification',
+  itemNamePlural: 'certifications',
+  fields: [
+    {
+      name: 'name',
+      label: 'Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Certification Name...'
+    },
+    {
+      name: 'issuer',
+      label: 'Issuer',
+      type: 'text',
+      required: true,
+      placeholder: 'Issuing Organization...'
+    },
+    {
+      name: 'date',
+      label: 'Date',
+      type: 'text',
+      placeholder: 'YYYY-MM'
+    },
+    {
+      name: 'url',
+      label: 'URL',
+      type: 'text',
+      placeholder: 'https://...'
+    }
+  ],
+  getItemTitle: (item) => item.name,
+  getItemSubtitle: (item) => item.issuer,
+  getItemDescription: (_item) => '',
+  getItemBadge: (item) => ({
+    text: item.date ? item.date.substring(0, 4) : 'Cert',
+    color: '#FFD700'
+  }),
+  createEmptyItem: () => ({
+    id: '',
+    name: '',
+    issuer: '',
+    date: '',
+    url: ''
+  }),
+  sortItems: (items) => items.sort((a, b) => {
+    const dateA = a.date || '0';
+    const dateB = b.date || '0';
+    return dateB.localeCompare(dateA);
+  })
+};
+
 // Export all configurations
 export const sectionConfigs = {
   chronicles: chroniclesConfig,
   skills: skillsConfig,
   experiences: experiencesConfig,
-  projects: projectsConfig
+  projects: projectsConfig,
+  education: educationConfig,
+  certifications: certificationsConfig
   // Add more as we implement them
 };

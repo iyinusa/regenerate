@@ -156,18 +156,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
         {/* Main Grid */}
         <div className="hero-grid">
-          {/* Narrative / Bio */}
-          <motion.div 
-            className="hero-narrative-box glass"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-          >
-            <div className="narrative-content">
-              {journey?.summary?.narrative || profile?.bio || profile?.description || 'No narrative available yet.'}
-            </div>
-          </motion.div>
-
           {/* Documentary Player */}
           <motion.div 
             className="hero-video-box glass"
@@ -197,6 +185,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
               }}
               onEditDocumentary={handleEditDocumentary}
             />
+          </motion.div>
+
+          {/* Narrative / Bio */}
+          <motion.div
+            className="hero-narrative-box glass"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+          >
+            <div className="narrative-content">
+              {journey?.summary?.narrative || profile?.bio || profile?.description || 'No narrative available yet.'}
+            </div>
           </motion.div>
         </div>
 

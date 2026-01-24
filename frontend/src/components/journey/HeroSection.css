@@ -97,7 +97,7 @@
 /* Grid Layout */
 .hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1.5fr; /* Narrative (Left) vs Video (Right) */
+  grid-template-columns: 1.5fr 1fr; /* Narrative (Left) vs Video (Right) */
   gap: 2rem;
   width: 100%;
   min-height: 400px;

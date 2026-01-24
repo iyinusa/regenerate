@@ -5,9 +5,10 @@ import './ProfileModal.css';
 const SECTIONS = [
   { id: 'chronicles', label: 'Chronicles' },
   { id: 'experience', label: 'Experience' },
-  { id: 'projects', label: 'Projects' },
   { id: 'skills', label: 'Expertise/Skills' },
-  { id: 'education', label: 'Education' }
+  { id: 'projects', label: 'Projects' },
+  { id: 'education', label: 'Academics' },
+  { id: 'certifications', label: 'Certifications' }
 ];
 
 interface PrivacySettings {
@@ -15,12 +16,23 @@ interface PrivacySettings {
     hidden_sections: Record<string, boolean>;
     username?: string;
     user_id: string;
+    guest_id: string;
+}
+
+interface ProfileData {
+    experiences?: any[];
+    education?: any[];
+    skills?: string[];
+    projects?: any[];
+    certifications?: any[];
+    timeline?: { events?: any[] };
 }
 
 const PrivacyTab: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<PrivacySettings | null>(null);
+    const [profileData, setProfileData] = useState<ProfileData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [username, setUsername] = useState('');
     const [copied, setCopied] = useState(false);
@@ -31,9 +43,24 @@ const PrivacyTab: React.FC = () => {
 
     const fetchSettings = async () => {
         try {
-            const data = await apiClient.request('/api/v1/privacy/');
-            setSettings(data);
-            setUsername(data.username || '');
+            // Fetch privacy settings
+            const privacyData = await apiClient.request('/api/v1/privacy/');
+            setSettings(privacyData);
+            setUsername(privacyData.username || '');
+            
+    // Fetch profile data to check what sections have content
+            try {
+                // Fetch complete journey data using the guest_id from privacy settings
+                const journeyResponse = await apiClient.getJourneyByGuestId(privacyData.guest_id);
+                
+                setProfileData({
+                    ...journeyResponse.profile,
+                    timeline: journeyResponse.timeline
+                });
+            } catch (profileErr) {
+                console.warn('Could not fetch profile data:', profileErr);
+                // Continue with just privacy settings if profile fetch fails
+            }
         } catch (err) {
             setError('Failed to load privacy settings');
             console.error(err);
@@ -88,6 +115,30 @@ const PrivacyTab: React.FC = () => {
         navigator.clipboard.writeText(publicUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Get sections that actually have data
+    const getAvailableSections = () => {
+        if (!profileData) return [];
+        
+        return SECTIONS.filter(section => {
+            switch (section.id) {
+                case 'chronicles':
+                    return profileData.timeline?.events && profileData.timeline.events.length > 0;
+                case 'experience':
+                    return profileData.experiences && profileData.experiences.length > 0;
+                case 'education':
+                    return profileData.education && profileData.education.length > 0;
+                case 'skills':
+                    return profileData.skills && profileData.skills.length > 0;
+                case 'projects':
+                    return profileData.projects && profileData.projects.length > 0;
+                case 'certifications':
+                    return profileData.certifications && profileData.certifications.length > 0;
+                default:
+                    return false;
+            }
+        });
     };
 
     if (loading) return <div className="profile-loading">Loading settings...</div>;
@@ -150,7 +201,7 @@ const PrivacyTab: React.FC = () => {
                 <p className="section-desc">Control which sections are displayed on your public profile.</p>
 
                 <div className="sections-list">
-                    {SECTIONS.map(section => (
+                    {getAvailableSections().map(section => (
                         <div key={section.id} className="section-item">
                             <span>{section.label}</span>
                              <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -168,6 +219,11 @@ const PrivacyTab: React.FC = () => {
                              </div>
                         </div>
                     ))}
+                    {getAvailableSections().length === 0 && (
+                        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', padding: '2rem' }}>
+                            No sections available. Complete your profile to see privacy options.
+                        </div>
+                    )}
                 </div>
             </div>
 

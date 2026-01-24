@@ -1113,6 +1113,303 @@ async def delete_project(
 
 
 # =====================================================================
+# Education CRUD Endpoints
+# =====================================================================
+
+@router.put(
+    "/education/{history_id}",
+    summary="Update Education",
+    description="Update education data for a specific profile history."
+)
+async def update_education(
+    history_id: str,
+    education: List[Dict[str, Any]],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    """Update education for a specific profile history.
+    
+    Args:
+        history_id: The profile history identifier
+        education: Updated list of education items
+        db: Database session
+        current_user: The authenticated user
+        
+    Returns:
+        Updated education data
+    """
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        logger.info(f"Updating education for history_id: {history_id}")
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail=f"History not found: {history_id}")
+            
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        structured_data = history.structured_data or {}
+        structured_data['education'] = education
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "education": structured_data.get('education', []),
+            "updated_at": structured_data['updated_at']
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update education: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/education/{history_id}/items",
+    summary="Add Education Item",
+    description="Add a new education item to the profile."
+)
+async def add_education(
+    history_id: str,
+    education_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        import uuid
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        structured_data = history.structured_data or {}
+        if 'education' not in structured_data:
+            structured_data['education'] = []
+            
+        if 'id' not in education_data:
+            education_data['id'] = str(uuid.uuid4())
+            
+        structured_data['education'].append(education_data)
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "education": structured_data.get('education', []),
+            "item": education_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete(
+    "/education/{history_id}/items/{item_id}",
+    summary="Delete Education Item",
+    description="Delete a specific education item."
+)
+async def delete_education(
+    history_id: str,
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        structured_data = history.structured_data or {}
+        if 'education' not in structured_data:
+            raise HTTPException(status_code=404, detail="Education section not found")
+            
+        items = structured_data['education']
+        structured_data['education'] = [i for i in items if i.get('id') != item_id]
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "education": structured_data.get('education', [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =====================================================================
+# Certifications CRUD Endpoints
+# =====================================================================
+
+@router.put(
+    "/certifications/{history_id}",
+    summary="Update Certifications",
+    description="Update certifications data for a specific profile history."
+)
+async def update_certifications(
+    history_id: str,
+    certifications: List[Dict[str, Any]],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        logger.info(f"Updating certifications for history_id: {history_id}")
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail=f"History not found: {history_id}")
+            
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        structured_data = history.structured_data or {}
+        structured_data['certifications'] = certifications
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "certifications": structured_data.get('certifications', []),
+            "updated_at": structured_data['updated_at']
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update certifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/certifications/{history_id}/items",
+    summary="Add Certification Item",
+    description="Add a new certification item to the profile."
+)
+async def add_certification(
+    history_id: str,
+    certification_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        import uuid
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        structured_data = history.structured_data or {}
+        if 'certifications' not in structured_data:
+            structured_data['certifications'] = []
+            
+        if 'id' not in certification_data:
+            certification_data['id'] = str(uuid.uuid4())
+            
+        structured_data['certifications'].append(certification_data)
+        structured_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "certifications": structured_data.get('certifications', []),
+            "item": certification_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete(
+    "/certifications/{history_id}/items/{item_id}",
+    summary="Delete Certification Item",
+    description="Delete a specific certification item."
+)
+async def delete_certification(
+    history_id: str,
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    try:
+        from app.models.user import ProfileHistory
+        from sqlalchemy import select
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        query = select(ProfileHistory).where(ProfileHistory.id == history_id)
+        result = await db.execute(query)
+        history = result.scalar_one_or_none()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail="History not found")
+        if history.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        structured_data = history.structured_data or {}
+        if 'certifications' not in structured_data:
+            raise HTTPException(status_code=404, detail="Certifications section not found")
+            
+        items = structured_data['certifications']
+        structured_data['certifications'] = [i for i in items if i.get('id') != item_id]
+        
+        history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
+        await db.commit()
+        
+        return {
+            "success": True,
+            "certifications": structured_data.get('certifications', [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =====================================================================
 # Documentary CRUD Endpoints
 # =====================================================================
 

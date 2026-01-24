@@ -1,0 +1,139 @@
+.education-section {
+  position: relative;
+  min-height: 100vh;
+  padding: 6rem 2rem;
+  overflow: hidden;
+  perspective: 1000px;
+}
+
+.education-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.education-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 3rem;
+  padding: 2rem 0;
+}
+
+.education-card-3d {
+  position: relative;
+  height: 400px;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  cursor: pointer;
+}
+
+.education-card-3d:hover {
+  transform: rotateY(10deg) rotateX(5deg) translateZ(20px);
+}
+
+.education-card-content {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 15, 30, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 20px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 
+    0 10px 30px -10px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 212, 255, 0.05),
+    inset 0 0 20px rgba(0, 212, 255, 0.05);
+  transform-style: preserve-3d;
+  overflow: hidden;
+}
+
+/* Glass shine effect */
+.education-card-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.03),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.education-card-3d:hover .education-card-content::before {
+  left: 100%;
+}
+
+.edu-year {
+  font-family: 'Space Mono', monospace;
+  color: #00d4ff;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 4px;
+  transform: translateZ(20px);
+}
+
+.edu-institution {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+  transform: translateZ(30px);
+  background: linear-gradient(90deg, #fff, #a5f3fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.edu-degree {
+  font-size: 1.1rem;
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+  transform: translateZ(25px);
+}
+
+.edu-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  transform: translateZ(15px);
+  flex-grow: 1;
+}
+
+.edu-icon {
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  font-size: 8rem;
+  opacity: 0.03;
+  transform: rotate(-15deg) translateZ(5px);
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+/* Floating background particles */
+.edu-background-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 50%;
+  filter: blur(4px);
+  opacity: 0.3;
+}

@@ -33,6 +33,7 @@ async def get_privacy_settings(
         is_public=privacy.is_public,
         hidden_sections=privacy.hidden_sections or {},
         user_id=current_user.id,
+        guest_id=current_user.guest_id,
         username=current_user.username
     )
     return response
@@ -75,6 +76,7 @@ async def update_privacy_settings(
         is_public=privacy.is_public,
         hidden_sections=privacy.hidden_sections or {},
         user_id=current_user.id,
+        guest_id=current_user.guest_id,
         username=current_user.username
     )
 

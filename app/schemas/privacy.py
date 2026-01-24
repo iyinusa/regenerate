@@ -10,6 +10,7 @@ class PrivacyUpdate(PrivacyBase):
 
 class PrivacyResponse(PrivacyBase):
     user_id: str
+    guest_id: str
     username: Optional[str] = None
     
     class Config:

@@ -7,6 +7,8 @@ import ImmersiveAudio from '@/components/ImmersiveAudio';
 import HeroSection from '@/components/journey/HeroSection';
 import TimelineSection from '@/components/journey/TimelineSection';
 import ExperienceSection from '@/components/journey/ExperienceSection';
+import EducationSection from '@/components/journey/EducationSection';
+import CertificationsSection from '@/components/journey/CertificationsSection';
 import SkillsSection from '@/components/journey/SkillsSection';
 import ProjectsSection from '@/components/journey/ProjectsSection';
 import DocumentarySection from '@/components/journey/DocumentarySection';
@@ -54,6 +56,10 @@ interface DocumentaryData {
   closing_statement?: string;
 }
 
+interface PrivacySettings {
+  hidden_sections?: Record<string, boolean>;
+}
+
 const Journey: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { guestId, username } = useParams(); // Added username
@@ -67,6 +73,7 @@ const Journey: React.FC = () => {
   const [introVideo, setIntroVideo] = useState<string | null>(null);
   const [fullVideo, setFullVideo] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeSection, setActiveSection] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -80,6 +87,31 @@ const Journey: React.FC = () => {
   // Public view (username present) disables editing
   const isPublicView = !!username;
   const canEdit = !isPublicView && isAuthenticated && guestId && currentUserGuestId && guestId === currentUserGuestId;
+
+  // Helper function to check if a section should be visible
+  const isSectionVisible = (sectionId: string) => {
+    if (!isPublicView || !privacySettings?.hidden_sections) return true;
+    return !privacySettings.hidden_sections[sectionId];
+  };
+
+  // Calculate visible sections for navigation
+  const getVisibleSections = () => {
+    // If not public view (owner mode), show sections even if empty so they can be edited
+    // If public view, only show populated sections
+    const shouldShow = (hasData: boolean) => hasData || !isPublicView;
+
+    const sections = [
+      { id: 'hero', index: 0, visible: true }, // Hero is always visible
+      { id: 'chronicles', index: 1, visible: isSectionVisible('chronicles') && shouldShow(!!(timeline?.events?.length)) },
+      { id: 'experience', index: 2, visible: isSectionVisible('experience') && shouldShow(!!(profile?.experiences?.length)) },
+      { id: 'education', index: 3, visible: isSectionVisible('education') && shouldShow(!!(profile?.education?.length)) },
+      { id: 'skills', index: 4, visible: isSectionVisible('skills') && shouldShow(!!(profile?.skills?.length)) },
+      { id: 'projects', index: 5, visible: isSectionVisible('projects') && shouldShow(!!(profile?.projects?.length)) },
+      { id: 'certifications', index: 6, visible: isSectionVisible('certifications') && shouldShow(!!(profile?.certifications?.length)) },
+      { id: 'documentary', index: 7, visible: !!documentary }
+    ];
+    return sections.filter(section => section.visible);
+  };
 
   useEffect(() => {
     // Determine if we're loading by jobId (traditional), guestId (new format), or username (public)
@@ -105,6 +137,7 @@ const Journey: React.FC = () => {
             setDocumentary(response.documentary || null);
             setIntroVideo(response.intro_video || null);
             setFullVideo(response.full_video || null);
+            setPrivacySettings({ hidden_sections: response.hidden_sections || {} });
             setLoading(false);
             return;
         }
@@ -316,7 +349,7 @@ const Journey: React.FC = () => {
         />
 
         {/* Timeline Section */}
-        {timeline && (
+        {((timeline?.events && timeline.events.length > 0) || !isPublicView) && isSectionVisible('chronicles') && (
           <TimelineSection 
             timeline={timeline}
             journey={journey}
@@ -327,9 +360,9 @@ const Journey: React.FC = () => {
         )}
 
         {/* Experience Section */}
-        {profile?.experiences && profile.experiences.length > 0 && (
+        {((profile?.experiences && profile.experiences.length > 0) || !isPublicView) && isSectionVisible('experience') && (
           <ExperienceSection 
-            experiences={profile.experiences}
+            experiences={profile?.experiences || []}
             journey={journey}
             sectionIndex={2}
             historyId={isPublicView ? undefined : (historyId || undefined)}
@@ -337,37 +370,55 @@ const Journey: React.FC = () => {
           />
         )}
 
+        {/* Skills Section */}
+        {((profile?.skills && profile.skills.length > 0) || !isPublicView) && isSectionVisible('skills') && (
+          <SkillsSection 
+            skills={profile?.skills || []}
+            journey={journey}
+            profile={profile || {}}
+            sectionIndex={3}
+          />
+        )}
+
         {/* Projects Section */}
-        {profile?.projects && profile.projects.length > 0 && (
+        {((profile?.projects && profile.projects.length > 0) || !isPublicView) && isSectionVisible('projects') && (
           <ProjectsSection 
-            projects={profile.projects}
-            achievements={profile.achievements}
+            projects={profile?.projects || []}
+            achievements={profile?.achievements || []}
             sectionIndex={4}
             historyId={isPublicView ? undefined : (historyId || undefined)}
             onRequestEdit={handleEdit}
           />
         )}
 
-        {/* Skills Section */}
-        {profile?.skills && profile.skills.length > 0 && (
-          <SkillsSection 
-            skills={profile.skills}
+        {/* Education Section */}
+        {((profile?.education && profile.education.length > 0) || !isPublicView) && isSectionVisible('education') && (
+          <EducationSection
+            education={profile?.education || []}
             journey={journey}
-            profile={profile}
-            sectionIndex={3}
+            sectionIndex={5}
+            historyId={isPublicView ? undefined : (historyId || undefined)}
+            onRequestEdit={handleEdit}
           />
         )}
 
-        {/* Education Section */}
-
-        {/* Certificate Section */}
+        {/* Certification Section */}
+        {((profile?.certifications && profile.certifications.length > 0) || !isPublicView) && isSectionVisible('certifications') && (
+          <CertificationsSection 
+            certifications={profile?.certifications || []}
+            journey={journey}
+            sectionIndex={6}
+            historyId={isPublicView ? undefined : (historyId || undefined)}
+            onRequestEdit={handleEdit}
+          />
+        )}
 
         {/* Documentary Section */}
         {documentary && (
           <DocumentarySection 
             documentary={documentary}
             profile={profile}
-            sectionIndex={5}
+            sectionIndex={7}
           />
         )}
       </div>
@@ -375,15 +426,15 @@ const Journey: React.FC = () => {
       {/* Section Navigation */}
       <nav className="section-navigation">
         <div className="nav-dots">
-          {[0, 1, 2, 3, 4, 5].map((index) => (
+          {getVisibleSections().map((section) => (
             <button
-              key={index}
-              className={`nav-dot ${activeSection === index ? 'active' : ''}`}
+              key={section.index}
+              className={`nav-dot ${activeSection === section.index ? 'active' : ''}`}
               onClick={() => {
-                const section = document.querySelector(`[data-section="${index}"]`);
-                section?.scrollIntoView({ behavior: 'smooth' });
+                const sectionElement = document.querySelector(`[data-section="${section.index}"]`);
+                sectionElement?.scrollIntoView({ behavior: 'smooth' });
               }}
-              aria-label={`Go to section ${index + 1}`}
+              aria-label={`Go to ${section.id} section`}
             />
           ))}
         </div>
