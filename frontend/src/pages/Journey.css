@@ -242,9 +242,8 @@ h2 {
 
 .nav-dot {
   width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  height: 3px;
+  border: 0.5px solid rgba(255, 255, 255, 0.4);
   background: transparent;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -423,8 +422,8 @@ h2 {
   }
 
   .nav-dot {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 3px;
   }
 }
 
