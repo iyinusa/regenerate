@@ -83,10 +83,36 @@ class ProfileExtractionService:
         # Generate Job ID
         job_id = f"prof_{uuid.uuid4().hex}"
         
+        # Check if this is the first history for the user to set as default
+        result = await db.execute(select(ProfileHistory).where(ProfileHistory.user_id == user.id))
+        all_histories = result.scalars().all()
+        existing_count = len(all_histories)
+        
+        # Determine if default (first one is default)
+        is_default = (existing_count == 0)
+        
+        # Generate default title
+        # Format: "Profile from [Domain] - [Date]" or just "Profile [N]"
+        # Requirement says "default title for each profile created".
+        # Let's simple "Profile N" or use domain.
+        from urllib.parse import urlparse
+        try:
+            domain = urlparse(url).netloc.replace('www.', '').split('.')[0].capitalize()
+            if not domain: domain = "Web"
+        except:
+            domain = "Profile"
+            
+        current_date = datetime.now().strftime("%b %d, %Y")
+        default_title = f"{domain} Profile - {current_date}"
+        if existing_count > 0:
+             default_title += f" ({existing_count + 1})"
+
         # Create ProfileHistory record
         history = ProfileHistory(
             user_id=user.id,
             source_url=url,
+            is_default=is_default,
+            title=default_title,
             raw_data={"job_id": job_id}
         )
         db.add(history)

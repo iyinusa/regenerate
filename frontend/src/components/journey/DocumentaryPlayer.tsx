@@ -11,6 +11,7 @@ interface DocumentaryPlayerProps {
     tagline?: string;
     segments?: any[];
   };
+  canEdit?: boolean;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
   onEditDocumentary?: () => void;
@@ -18,6 +19,7 @@ interface DocumentaryPlayerProps {
 
 const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   documentary,
+  canEdit = true,
   onGenerateVideo,
   onRegenerateVideo,
   onEditDocumentary
@@ -313,7 +315,7 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
                           className="control-btn play-pause-small"
                           onClick={handlePlayPause}
                         >
-                          {isPlaying ? '⏸️' : '▶️'}
+                          {isPlaying ? '❚❚' : '▶'}
                         </button>
                       </div>
 
@@ -378,21 +380,23 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
               <h3 className="empty-title">Documentary Awaits</h3>
               <p className="empty-subtitle">Create your cinematic story</p>
               
-              <motion.button
-                className="generate-video-btn"
-                onClick={onGenerateVideo}
-                whileHover={{ 
-                  scale: 1.05,
-                  boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"
-                }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <span className="btn-text">Generate Documentary Video</span>
-                <div className="btn-glow"></div>
-              </motion.button>
+              {canEdit && (
+                <motion.button
+                  className="generate-video-btn"
+                  onClick={onGenerateVideo}
+                  whileHover={{ 
+                    scale: 1.05,
+                    boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <span className="btn-text">Generate Documentary Video</span>
+                  <div className="btn-glow"></div>
+                </motion.button>
+              )}
             </div>
             
             {/* Animated background elements */}

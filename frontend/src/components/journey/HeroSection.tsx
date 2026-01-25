@@ -13,6 +13,7 @@ interface HeroSectionProps {
   fullVideo?: string | null;
   sectionIndex: number;
   historyId?: string;
+  canEdit?: boolean;
   onDocumentaryUpdate?: (updatedDocumentary: any) => void;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
@@ -27,6 +28,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   fullVideo,
   sectionIndex,
   historyId,
+  // canEdit = true,
   onDocumentaryUpdate,
   onGenerateVideo,
   onRegenerateVideo,
@@ -169,6 +171,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 intro_url: introVideo,
                 full_video: fullVideo
               }}
+              // canEdit={canEdit}
               onGenerateVideo={() => {
                 if (onGenerateVideo) {
                     onGenerateVideo();

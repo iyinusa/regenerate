@@ -1,0 +1,173 @@
+
+/* History Tab Styles */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.history-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.history-item.default-history {
+  border-color: rgba(64, 156, 255, 0.3);
+  background: rgba(64, 156, 255, 0.05);
+}
+
+.history-info {
+  flex: 1;
+}
+
+.history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.history-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-title .edit-icon-small {
+    font-size: 0.8em;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.history-title:hover .edit-icon-small {
+    opacity: 1;
+}
+
+.default-badge {
+  font-size: 0.7rem;
+  background: rgba(64, 156, 255, 0.2);
+  color: #409cff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.history-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  align-items: center;
+}
+
+.history-url {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+  color: #eee;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.load-btn {
+  background: rgba(64, 156, 255, 0.15);
+  color: #409cff;
+}
+.load-btn:hover:not(:disabled) {
+  background: rgba(64, 156, 255, 0.25);
+}
+
+.make-default-btn {
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+}
+
+.delete-btn {
+  background: rgba(255, 50, 50, 0.1);
+  color: #ff6b6b;
+}
+.delete-btn:hover:not(:disabled) {
+  background: rgba(255, 50, 50, 0.2);
+}
+
+.edit-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-title-input {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+.edit-title-input:focus,.edit-title-input:focus-visible, .edit-title-input:active {
+    outline: none;
+    border: none;
+}
+
+.save-btn-small, .cancel-btn-small {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1em;
+    color: white;
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+@media (max-width: 600px) {
+    .history-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .history-actions {
+        margin-left: 0;
+        margin-top: 12px;
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

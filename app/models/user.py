@@ -45,6 +45,8 @@ class ProfileHistory(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(ForeignKey("rg_users.id"), index=True)
     source_url: Mapped[str] = mapped_column(String(1024))
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_default: Mapped[bool] = mapped_column(default=False)
     raw_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     structured_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     intro_video: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)

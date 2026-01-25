@@ -86,7 +86,7 @@ const Journey: React.FC = () => {
   // We compare the URL guestId with the authenticated user's guestId
   // Public view (username present) disables editing
   const isPublicView = !!username;
-  const canEdit = !isPublicView && isAuthenticated && guestId && currentUserGuestId && guestId === currentUserGuestId;
+  const canEdit = !isPublicView && isAuthenticated && !!guestId && !!currentUserGuestId && guestId === currentUserGuestId;
 
   // Helper function to check if a section should be visible
   const isSectionVisible = (sectionId: string) => {
@@ -144,7 +144,8 @@ const Journey: React.FC = () => {
 
         if (guestId) {
           // New format: /journey/{guest_id}
-          response = await apiClient.getJourneyByGuestId(guestId);
+          const historyIdParam = searchParams.get('history_id');
+          response = await apiClient.getJourneyByGuestId(guestId, historyIdParam);
           
           // Data structure from guest_id endpoint is different
           setProfile(response.profile || null);
@@ -334,6 +335,7 @@ const Journey: React.FC = () => {
           fullVideo={fullVideo}
           sectionIndex={0}
           historyId={historyId || undefined}
+          // canEdit={canEdit}
           onDocumentaryUpdate={setDocumentary}
           onGenerateVideo={() => {
             handleEdit('generate video', () => {

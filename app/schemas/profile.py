@@ -98,12 +98,24 @@ class ExtractedProfileData(BaseModel):
     website: Optional[str] = None
     linkedin: Optional[str] = None
     github: Optional[str] = None
-    social_links: Dict[str, str] = Field(default_factory=dict)
-    
-    # Metadata
+
+
+class ProfileHistoryResponse(BaseModel):
+    """Schema for profile history/version."""
+    id: str
+    title: Optional[str] = None
     source_url: str
-    extraction_timestamp: datetime
-    raw_data: Dict[str, Any] = Field(default_factory=dict)
+    is_default: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ProfileHistoryUpdate(BaseModel):
+    """Schema for updating profile history."""
+    title: Optional[str] = None
+    is_default: Optional[bool] = None
     
     class Config:
         json_schema_extra = {

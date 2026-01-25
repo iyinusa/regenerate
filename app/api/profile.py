@@ -1,11 +1,12 @@
 """Profile API routes."""
 
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.profile import (
@@ -14,12 +15,14 @@ from app.schemas.profile import (
     ProfileStatusResponse,
     ProfileStatus,
     TaskInfo,
+    ProfileHistoryResponse,
+    ProfileHistoryUpdate
 )
 from app.services.profile_service import profile_service
 from app.services.task_orchestrator import task_orchestrator
 from app.db.session import get_db
 from app.core.dependencies import get_current_user_required
-from app.models.user import User
+from app.models.user import User, ProfileHistory
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -178,6 +181,22 @@ async def get_task_details(job_id: str) -> Dict[str, Any]:
 
 
 @router.get(
+    "/history",
+    response_model=List[ProfileHistoryResponse],
+    summary="Get Profile History",
+    description="List all profile histories/versions for the current user."
+)
+async def get_profile_history(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> List[ProfileHistoryResponse]:
+    query = select(ProfileHistory).where(ProfileHistory.user_id == current_user.id).order_by(ProfileHistory.created_at.desc())
+    result = await db.execute(query)
+    histories = result.scalars().all()
+    return histories
+
+
+@router.get(
     "/{profile_id}",
     summary="Get Profile Data", 
     description="Retrieve the complete extracted profile data by profile ID."
@@ -229,19 +248,21 @@ async def get_profile(
 @router.get(
     "/journey/{guest_id}",
     summary="Get Journey Data by Guest ID",
-    description="Retrieve the most recent journey data for a guest user."
+    description="Retrieve the journey data for a guest user. Prioritizes specific history ID, then default profile, then most recent."
 )
 async def get_journey_by_guest_id(
     guest_id: str,
+    history_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get the most recent journey data by guest ID.
+    """Get journey data by guest ID.
     
-    This endpoint loads the latest profile history for the given guest_id,
-    enabling consistent journey experiences and supporting future username conversion.
+    This endpoint loads the profile history for the given guest_id.
+    Logic: requested history_id -> default history -> most recent history.
     
     Args:
         guest_id: The guest user identifier
+        history_id: Optional specific history version to load
         db: Database session
         
     Returns:
@@ -251,7 +272,7 @@ async def get_journey_by_guest_id(
         from app.models.user import User, ProfileHistory
         from sqlalchemy import select
         
-        logger.info(f"Looking for journey data for guest_id: {guest_id}")
+        logger.info(f"Looking for journey data for guest_id: {guest_id}, history_id: {history_id}")
         
         # Find user by guest_id
         user_query = select(User).where(User.guest_id == guest_id)
@@ -267,12 +288,33 @@ async def get_journey_by_guest_id(
         
         logger.info(f"Found user {user.id} for guest_id: {guest_id}")
         
-        # Get the most recent profile history
-        history_query = select(ProfileHistory).where(
-            ProfileHistory.user_id == user.id
-        ).order_by(ProfileHistory.created_at.desc())
-        result = await db.execute(history_query)
-        latest_history = result.scalars().first()
+        latest_history = None
+        
+        # 1. Try to fetch specific history if requested
+        if history_id:
+             h_query = select(ProfileHistory).where(
+                 ProfileHistory.id == history_id,
+                 ProfileHistory.user_id == user.id
+             )
+             res = await db.execute(h_query)
+             latest_history = res.scalar_one_or_none()
+        
+        # 2. If not found or not requested, try default
+        if not latest_history:
+            d_query = select(ProfileHistory).where(
+                ProfileHistory.user_id == user.id,
+                ProfileHistory.is_default == True
+            )
+            res = await db.execute(d_query)
+            latest_history = res.scalar_one_or_none()
+            
+        # 3. Fallback to most recent
+        if not latest_history:
+            history_query = select(ProfileHistory).where(
+                ProfileHistory.user_id == user.id
+            ).order_by(ProfileHistory.created_at.desc())
+            result = await db.execute(history_query)
+            latest_history = result.scalars().first()
         
         if not latest_history:
             logger.warning(f"No profile history found for user {user.id}")
@@ -281,13 +323,8 @@ async def get_journey_by_guest_id(
                 detail=f"No profile history found for guest_id: {guest_id}"
             )
         
-        logger.info(f"Found profile history {latest_history.id}, structured_data exists: {latest_history.structured_data is not None}, raw_data exists: {latest_history.raw_data is not None}")
+        logger.info(f"Found profile history {latest_history.id} (Default: {latest_history.is_default}), structured_data exists: {latest_history.structured_data is not None}, raw_data exists: {latest_history.raw_data is not None}")
         
-        if not latest_history:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No profile history found for guest_id: {guest_id}"
-            )
         
         # Get structured data, provide fallback if empty
         structured_data = latest_history.structured_data or {}
@@ -1490,3 +1527,94 @@ async def update_documentary(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update documentary: {str(e)}"
         )
+
+@router.put(
+    "/history/{history_id}",
+    response_model=ProfileHistoryResponse,
+    summary="Update Profile History",
+    description="Update title or set as default."
+)
+async def update_profile_history(
+    history_id: str,
+    update_data: ProfileHistoryUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+) -> ProfileHistoryResponse:
+    # Check if history exists and belongs to user
+    query = select(ProfileHistory).where(
+        ProfileHistory.id == history_id,
+        ProfileHistory.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    history = result.scalar_one_or_none()
+    
+    if not history:
+        raise HTTPException(status_code=404, detail="Profile history not found")
+    
+    if update_data.title is not None:
+        history.title = update_data.title
+    
+    if update_data.is_default:
+        # Unset other defaults
+        await db.execute(
+            update(ProfileHistory)
+            .where(ProfileHistory.user_id == current_user.id)
+            .where(ProfileHistory.id != history_id)
+            .values(is_default=False)
+        )
+        history.is_default = True
+    
+    await db.commit()
+    await db.refresh(history)
+    return history
+
+@router.delete(
+    "/history/{history_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Profile History",
+    description="Delete a profile history."
+)
+async def delete_profile_history(
+    history_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    # Check if history exists and belongs to user
+    query = select(ProfileHistory).where(
+        ProfileHistory.id == history_id,
+        ProfileHistory.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    history = result.scalar_one_or_none()
+    
+    if not history:
+        raise HTTPException(status_code=404, detail="Profile history not found")
+    
+    # Optional logic: if default is deleted, should we warn? Frontend handles warning.
+    
+    await db.delete(history)
+    await db.commit()
+    return None
+
+@router.get(
+    "/history/{history_id}",
+    summary="Get Specific Profile History",
+    description="Get full details (including structured data) of a profile history."
+)
+async def get_profile_history_details(
+    history_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    query = select(ProfileHistory).where(
+        ProfileHistory.id == history_id,
+        ProfileHistory.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    history = result.scalar_one_or_none()
+    
+    if not history:
+        raise HTTPException(status_code=404, detail="Profile history not found")
+    
+    return history
+

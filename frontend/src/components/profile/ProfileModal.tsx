@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import ProfileTab from './ProfileTab';
 import PrivacyTab from './PrivacyTab';
+import HistoryTab from './HistoryTab';
 import './ProfileModal.css';
 
 interface ProfileModalProps {
@@ -28,14 +29,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
       case 'privacy':
         return <PrivacyTab />;
       case 'history':
-        return (
-          <div className="placeholder-tab">
-            <div className="placeholder-icon">📜</div>
-            <h3>History</h3>
-            <p>View your past profile generations and activities.</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '8px' }}>(Coming Soon)</p>
-          </div>
-        );
+        return <HistoryTab />;
       case 'subscription':
         return (
           <div className="placeholder-tab">
@@ -55,7 +49,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
       <div className="profile-modal glass" onClick={(e) => e.stopPropagation()}>
         <div className="profile-modal-header">
           <div className="profile-modal-title-bar">
-            <h2 className="profile-modal-title">Settings</h2>
+            <h2 className="profile-modal-title">Manage Account</h2>
             <button className="profile-close-btn" onClick={onClose} aria-label="Close">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
