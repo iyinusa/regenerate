@@ -41,40 +41,40 @@
 	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	border: 1px solid var(--glass-border);
 	backdrop-filter: blur(10px);
 }
 
 .login-btn {
-	background: rgba(255, 255, 255, 0.05);
-	color: #fff;
+	background: var(--glass);
+	color: var(--text-primary);
 }
 
 .login-btn:hover {
-	background: rgba(255, 255, 255, 0.1);
-	border-color: rgba(255, 255, 255, 0.3);
+	background: var(--glass);
+	border-color: var(--glass-border);
 	transform: translateY(-2px);
-	box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.3);
+	box-shadow: 0 10px 20px -10px var(--glass-border);
 }
 
 .user-menu {
-	background: rgba(18, 18, 24, 0.8);
+	background: var(--glass);
 	backdrop-filter: blur(20px);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	border: 1px solid var(--glass-border);
 	border-radius: 16px;
 	padding: 0.75rem 1rem;
 	min-width: 220px;
-	box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+	box-shadow: 0 20px 40px -10px var(--glass-border);
 	transition: all 0.3s ease;
 }
 
 .user-menu:hover {
-	background: rgba(18, 18, 24, 0.9);
-	border-color: rgba(255, 255, 255, 0.2);
+	background: var(--glass);
+	border-color: var(--glass-border);
 }
 
 .user-info {
-	color: #fff;
+	color: var(--text-primary);
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
@@ -83,7 +83,7 @@
 .user-name {
 	font-size: 1rem;
 	font-weight: 700;
-	color: #fff;
+	color: var(--text-primary);
 	display: flex;
 	align-items: center;
 	padding: 0.25rem 0.5rem;
@@ -92,7 +92,7 @@
 }
 
 .user-name:hover {
-	background: rgba(255, 255, 255, 0.05);
+	background: var(--glass);
 	color: var(--accent-blue);
 }
 
@@ -113,9 +113,9 @@
 }
 
 .badge.github {
-	background: rgba(255, 255, 255, 0.1);
-	border: 1px solid rgba(255, 255, 255, 0.1);
-	color: #e0e0e0;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	color: var(--text-secondary);
 }
 
 .badge.linkedin {
@@ -198,7 +198,7 @@
 	line-height: 0.9;
 	margin-top: 3rem;
 	margin-bottom: 3rem;
-	color: #fff;
+	color: var(--text-primary);
 	letter-spacing: -0.05em;
 }
 
@@ -213,7 +213,7 @@
 	font-family: 'Nunito Sans', sans-serif;
 	font-size: 1.5rem;
 	line-height: 1.4;
-	color: rgba(255, 255, 255, 0.6);
+	color: var(--text-secondary);
 	max-width: 700px;
 	margin-top: 6rem;
 	margin-bottom: 6rem;
@@ -221,7 +221,7 @@
 }
 
 .highlight {
-	color: #fff;
+	color: var(--text-primary);
 	font-weight: 700;
 	border-bottom: 2px solid var(--accent-blue);
 }
@@ -252,7 +252,7 @@
 .cli-input {
 	background: transparent;
 	border: none;
-	color: #fff;
+	color: var(--text-primary);
 	font-family: 'Nunito Sans', sans-serif;
 	font-size: 1.25rem;
 	flex: 1;
@@ -344,9 +344,9 @@
 	display: flex;
 	align-items: center;
 	gap: 0.75rem;
-	background: rgba(255, 255, 255, 0.05);
-	color: #fff;
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--text-primary);
+	border: 1px solid rgba(255, 255, 255, 0.08);
 	padding: 0.75rem 1.5rem;
 	border-radius: 100px;
 	font-family: 'Nunito Sans', sans-serif;
@@ -418,13 +418,13 @@
 	font-size: 1.5rem;
 	font-weight: 800;
 	margin-bottom: 1rem;
-	color: #fff;
+	color: var(--text-primary);
 }
 
 .feature-card p {
 	font-family: 'Nunito Sans', sans-serif;
 	font-size: 1.2rem;
-	color: rgba(255, 255, 255, 0.5);
+	color: var(--text-secondary);
 	line-height: 1.5;
 }
 
@@ -433,7 +433,7 @@
 	width: 60vw;
 	height: 60vw;
 	border-radius: 50%;
-	background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+	background: radial-gradient(circle, rgba(31, 74, 174, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
 	pointer-events: none;
 	z-index: -1;
 	filter: blur(100px);

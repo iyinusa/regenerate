@@ -8,7 +8,7 @@
 }
 
 .history-item {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 16px;
@@ -19,14 +19,14 @@
 }
 
 .history-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass);
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--glass-border);
 }
 
 .history-item.default-history {
-  border-color: rgba(64, 156, 255, 0.3);
-  background: rgba(64, 156, 255, 0.05);
+  border-color: var(--accent-blue);
+  background: var(--accent-blue);
 }
 
 .history-info {
@@ -43,7 +43,7 @@
 .history-title {
   font-weight: 600;
   font-size: 1.1rem;
-  color: #fff;
+  color: var(--text-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -62,8 +62,8 @@
 
 .default-badge {
   font-size: 0.7rem;
-  background: rgba(64, 156, 255, 0.2);
-  color: #409cff;
+  background: var(--accent-blue);
+  color: var(--accent-blue);
   padding: 2px 8px;
   border-radius: 10px;
   font-weight: 600;
@@ -73,7 +73,7 @@
   display: flex;
   gap: 12px;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   align-items: center;
 }
 
@@ -96,13 +96,13 @@
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid transparent;
-  color: #eee;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
 }
 
 .action-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--glass);
 }
 
 .action-btn:disabled {
@@ -111,24 +111,24 @@
 }
 
 .load-btn {
-  background: rgba(64, 156, 255, 0.15);
-  color: #409cff;
+  background: var(--accent-blue);
+  color: var(--accent-blue);
 }
 .load-btn:hover:not(:disabled) {
-  background: rgba(64, 156, 255, 0.25);
+  background: var(--accent-blue);
 }
 
 .make-default-btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass);
   font-size: 0.8rem;
 }
 
 .delete-btn {
-  background: rgba(255, 50, 50, 0.1);
-  color: #ff6b6b;
+  background: var(--accent-pink);
+  color: var(--accent-pink);
 }
 .delete-btn:hover:not(:disabled) {
-  background: rgba(255, 50, 50, 0.2);
+  background: var(--accent-pink);
 }
 
 .edit-title-group {
@@ -140,7 +140,7 @@
 .edit-title-input {
     background: transparent;
     border: none;
-    color: white;
+    color: var(--text-primary);
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 1rem;
@@ -155,7 +155,7 @@
     border: none;
     cursor: pointer;
     font-size: 1.1em;
-    color: white;
+    color: var(--text-primary);
     text-shadow: 0 0 5px rgba(0,0,0,0.5);
 }
 

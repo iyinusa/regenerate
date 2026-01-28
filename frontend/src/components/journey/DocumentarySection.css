@@ -24,7 +24,7 @@
 .documentary-tagline {
   font-size: 1.3rem;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   margin: 1.5rem 0;
   max-width: 700px;
   margin-left: auto;
@@ -38,8 +38,8 @@
   margin-top: 1.5rem;
   padding: 0.8rem 1.5rem;
   border-radius: 25px;
-  background: rgba(0, 212, 255, 0.1);
-  color: #00d4ff;
+  background: rgba(31, 74, 174, 0.1);
+  color: #113493;
   font-size: 0.95rem;
   font-weight: 600;
 }
@@ -67,7 +67,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, #00d4ff, #7b2ff7, #ff2e97);
+  background: linear-gradient(180deg, #113493, #7b2ff7, #ff2e97);
 }
 
 .segment-card {
@@ -87,8 +87,8 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #00d4ff;
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+  background: #113493;
+  box-shadow: 0 0 20px rgba(31, 74, 174, 0.6);
   z-index: 2;
 }
 
@@ -97,13 +97,13 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(123, 47, 247, 0.2));
+  background: linear-gradient(135deg, rgba(31, 74, 174, 0.2), rgba(123, 47, 247, 0.2));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
   font-weight: 700;
-  color: #00d4ff;
+  color: #113493;
 }
 
 .segment-content {
@@ -113,7 +113,7 @@
 .segment-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 0.75rem;
 }
 
@@ -132,30 +132,30 @@
   padding: 1.5rem;
   border-radius: 12px;
   margin: 1rem 0;
-  border-left: 3px solid #00d4ff;
+  border-left: 3px solid #113493;
 }
 
 .narration-icon {
   display: inline-flex;
-  color: #00d4ff;
+  color: #113493;
   margin-bottom: 0.5rem;
 }
 
 .segment-narration p {
   font-size: 1rem;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
 .segment-visuals {
   font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   margin-top: 1rem;
 }
 
 .segment-visuals strong {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
 }
 
 .segment-moments {
@@ -166,7 +166,7 @@
 
 .segment-moments li {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   padding-left: 1.5rem;
   position: relative;
   margin-bottom: 0.5rem;
@@ -176,7 +176,7 @@
   content: '▸';
   position: absolute;
   left: 0;
-  color: #00d4ff;
+  color: #113493;
 }
 
 /* Closing Statement */
@@ -206,14 +206,14 @@
 .closing-title {
   font-size: 1.8rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 1rem;
 }
 
 .closing-statement {
   font-size: 1.2rem;
   line-height: 1.8;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   max-width: 700px;
   margin: 0 auto;
 }
@@ -230,9 +230,9 @@
   gap: 1rem;
   padding: 1.2rem 3rem;
   border-radius: 50px;
-  border: 2px solid #00d4ff;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(123, 47, 247, 0.1));
-  color: #fff;
+  border: 2px solid #113493;
+  background: linear-gradient(135deg, rgba(31, 74, 174, 0.1), rgba(123, 47, 247, 0.1));
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
@@ -240,13 +240,13 @@
 }
 
 .generate-video-btn:hover {
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(123, 47, 247, 0.3));
-  box-shadow: 0 10px 40px rgba(0, 212, 255, 0.4);
+  background: linear-gradient(135deg, rgba(31, 74, 174, 0.3), rgba(123, 47, 247, 0.3));
+  box-shadow: 0 10px 40px rgba(31, 74, 174, 0.4);
   transform: translateY(-3px);
 }
 
 .generate-video-btn svg {
-  color: #00d4ff;
+  color: #113493;
 }
 
 .video-note {

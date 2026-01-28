@@ -1,19 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@100;200;300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
+
+/* Default: dark theme */
 :root {
 	--primary-bg: #000011;
 	--secondary-bg: #0a0a1a;
-	--accent-blue: #00d4ff;
+	--accent-blue: #5c83ef;
 	--accent-purple: #7c3aed;
 	--accent-pink: #ec4899;
 	--text-primary: #ffffff;
-	--text-secondary: #a0a0a0;
+	--text-secondary: #c0c0c0;
 	--text-muted: #666666;
-	--gradient-primary: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-	--gradient-secondary: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+	--text-gold: #FFD700;
+	--gradient-primary: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255,255, 0.3));
+	--gradient-secondary: linear-gradient(135deg, rgba(205, 205, 205, 0.8), rgba(205, 205, 205, 0.3));
 	--glass: rgba(255, 255, 255, 0.05);
 	--glass-border: rgba(255, 255, 255, 0.1);
 	--font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Light theme overrides */
+[data-theme='light'] {
+	--primary-bg: #f7f8fa;
+	--secondary-bg: #ffffff;
+	--accent-blue: #2563eb;
+	--accent-purple: #a78bfa;
+	--accent-pink: #f472b6;
+	--text-primary: #18181b;
+	--text-secondary: #52525b;
+	--text-muted: #a1a1aa;
+	--text-gold: #877902;
+	--gradient-primary: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.3));
+	--gradient-secondary: linear-gradient(135deg, rgba(100, 100, 100, 0.8), rgba(100, 100, 100, 0.3));
+	--glass: rgba(255, 255, 255, 0.7);
+	--glass-border: rgba(0, 0, 0, 0.07);
 }
 
 * {
@@ -132,7 +152,7 @@ body {
 
 .btn-primary:hover {
 	transform: translateY(-2px);
-	box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+	box-shadow: 0 10px 30px rgba(31, 74, 174, 0.3);
 }
 
 .btn-secondary {
@@ -156,7 +176,42 @@ body {
 	background: var(--accent-blue);
 	color: var(--primary-bg);
 	transform: translateY(-2px);
-	box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+	box-shadow: 0 10px 30px rgba(31, 74, 174, 0.3);
+}
+
+/* Modal Popup Styles */
+.rg-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.8);
+	backdrop-filter: blur(8px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	padding: 1rem;
+}
+
+.rg-modal {
+	display: flex;
+	flex-direction: column;
+	top: 0%;
+	background: rgba(255, 255, 255, 0.08);
+	-webkit-backdrop-filter: blur(15px) saturate(180%);
+	backdrop-filter: blur(15px) saturate(180%);
+	border: 1px solid rgba(80, 200, 255, 0.25);
+	border-radius: 20px;
+	width: 95%;
+	max-width: 900px;
+	max-height: 90vh;
+	overflow: hidden;
+	box-shadow:
+		0 20px 60px rgba(0, 0, 0, 0.5),
+		0 0 40px rgba(0, 200, 255, 0.1),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* Responsive Design */

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
+import { useTheme } from '../hooks/useTheme';
 
 interface JourneyBackgroundProps {
   activeSection?: number;
@@ -18,15 +19,12 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
   const mouseXRef = useRef(0);
   const mouseYRef = useRef(0);
 
-  // Determine initial theme based on time
-  const [theme] = useState<'day' | 'night'>(() => {
-    const hour = new Date().getHours();
-    return (hour >= 6 && hour < 18) ? 'day' : 'night';
-  });
+  // Get current theme
+  const { theme } = useTheme();
 
   // Section color configurations
   const sectionColors = [
-    { primary: 0x00d4ff, secondary: 0x0099cc }, // Hero - Cyan
+    { primary: 0x113493, secondary: 0x0099cc }, // Hero - Cyan
     { primary: 0x7b2ff7, secondary: 0x5a1fd6 }, // Timeline - Purple
     { primary: 0xff2e97, secondary: 0xcc2579 }, // Experience - Pink
     { primary: 0x00ff88, secondary: 0x00cc6a }, // Skills - Green
@@ -65,7 +63,8 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
 
     const particleTexture = createParticleTexture();
 
-    const bgColor = theme === 'day' ? 0x2b4c7e : 0x030308;
+    const isLightTheme = theme === 'light';
+    const bgColor = isLightTheme ? 0xffffff : 0x030308;
     scene.fog = new THREE.FogExp2(bgColor, 0.008);
 
     // Camera setup
@@ -129,8 +128,8 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
         depthWrite: false,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
+        opacity: isLightTheme ? 1.0 : 0.8,
+        blending: isLightTheme ? THREE.NormalBlending : THREE.AdditiveBlending,
         sizeAttenuation: true
       });
 
@@ -152,10 +151,14 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
         positions[i3 + 1] = (Math.random() - 0.5) * 400;
         positions[i3 + 2] = (Math.random() - 0.5) * 200;
 
-        const intensity = 0.2 + Math.random() * 0.3;
-        colors[i3] = intensity;
-        colors[i3 + 1] = intensity;
-        colors[i3 + 2] = intensity;
+        // In light theme, we want darker dust (low RGB values), in dark theme light dust (high RGB values)
+        const val = isLightTheme 
+          ? 0 + Math.random() * 0.3 // Very dark grey/black
+          : 0.2 + Math.random() * 0.3; // Light grey
+
+        colors[i3] = val;
+        colors[i3 + 1] = val;
+        colors[i3 + 2] = val;
       }
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -167,8 +170,8 @@ const JourneyBackground: React.FC<JourneyBackgroundProps> = ({ activeSection = 0
         depthWrite: false,
         vertexColors: true,
         transparent: true,
-        opacity: 0.4,
-        blending: THREE.AdditiveBlending
+        opacity: isLightTheme ? 0.6 : 0.4,
+        blending: isLightTheme ? THREE.NormalBlending : THREE.AdditiveBlending
       });
 
       const particles = new THREE.Points(geometry, material);

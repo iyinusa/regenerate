@@ -70,24 +70,12 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
                 onClick={handleOpenEditModal}
                 className="edit-section-btn"
                 title="Edit Experience"
-                style={{
-                  background: 'rgba(0, 212, 255, 0.15)',
-                  border: '1px solid rgba(0, 212, 255, 0.3)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                  color: '#00d4ff',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.25)';
+                  e.currentTarget.style.background = 'rgba(31, 74, 174, 0.25)';
                   e.currentTarget.style.transform = 'scale(1.05)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.15)';
+                  e.currentTarget.style.background = 'rgba(31, 74, 174, 0.15)';
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
@@ -180,7 +168,7 @@ const ChapterCard: React.FC<{ chapter: any; index: number }> = ({ chapter, index
 
   return (
     <motion.div
-      className="chapter-card-container glass"
+      className="chapter-card-container"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -227,7 +215,7 @@ const ChapterCard: React.FC<{ chapter: any; index: number }> = ({ chapter, index
             <div className="chapter-learnings">
               <div className="learnings-title">Key Learnings:</div>
               <ul>
-                {chapter.key_learnings.slice(0, 3).map((learning: string, i: number) => (
+                {chapter.key_learnings.map((learning: string, i: number) => (
                   <li key={i}>{learning}</li>
                 ))}
               </ul>
@@ -245,8 +233,8 @@ const ExperienceCard: React.FC<{ experience: any }> = ({ experience }) => {
   const springProps = useSpring({
     transform: hovered ? 'scale(1.02)' : 'scale(1)',
     boxShadow: hovered
-      ? '0 20px 60px rgba(0, 212, 255, 0.2)'
-      : '0 8px 32px rgba(0, 212, 255, 0.1)',
+      ? '0 20px 60px rgba(31, 74, 174, 0.2)'
+      : '0 8px 32px rgba(31, 74, 174, 0.1)',
   });
 
   return (

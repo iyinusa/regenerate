@@ -22,22 +22,21 @@
 
 .education-card-3d {
   position: relative;
-  height: 400px;
+  height: 320px;
   transform-style: preserve-3d;
   transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
   cursor: pointer;
 }
 
 .education-card-3d:hover {
-  transform: rotateY(10deg) rotateX(5deg) translateZ(20px);
+  transform: rotateY(20deg) rotateX(10deg) translateZ(40px) !important;
 }
 
 .education-card-content {
   position: absolute;
   inset: 0;
-  background: rgba(10, 15, 30, 0.7);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 212, 255, 0.1);
+  border: 1px solid var(--glass-border);
   border-radius: 20px;
   padding: 2rem;
   display: flex;
@@ -45,8 +44,8 @@
   justify-content: space-between;
   box-shadow: 
     0 10px 30px -10px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 212, 255, 0.05),
-    inset 0 0 20px rgba(0, 212, 255, 0.05);
+    0 0 0 1px rgba(31, 74, 174, 0.05),
+    inset 0 0 20px rgba(31, 74, 174, 0.05);
   transform-style: preserve-3d;
   overflow: hidden;
 }
@@ -62,7 +61,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.03),
+    var(--glass-shine),
     transparent
   );
   transition: 0.5s;
@@ -74,39 +73,42 @@
 
 .edu-year {
   font-family: 'Space Mono', monospace;
-  color: #00d4ff;
+  color: var(--accent-blue);
   font-size: 0.9rem;
   margin-bottom: 1rem;
   display: inline-block;
   padding: 0.25rem 0.75rem;
-  background: rgba(0, 212, 255, 0.1);
-  border-radius: 4px;
+  background: var(--glass-bg);
+  border-radius: 10px;
   transform: translateZ(20px);
 }
 
 .edu-institution {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
   line-height: 1.2;
   transform: translateZ(30px);
-  background: linear-gradient(90deg, #fff, #a5f3fc);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .edu-degree {
   font-size: 1.1rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-bottom: 1.5rem;
   transform: translateZ(25px);
+}
+
+.edu-degree span {
+  font-weight: 700;
+  color: var(--accent-blue);
 }
 
 .edu-description {
   font-size: 0.95rem;
   line-height: 1.6;
-  color: #cbd5e1;
+  color: var(--text-secondary);
+  opacity: 0.9;
   transform: translateZ(15px);
   flex-grow: 1;
 }
@@ -132,7 +134,7 @@
 
 .particle {
   position: absolute;
-  background: rgba(0, 212, 255, 0.1);
+  background: rgba(31, 74, 174, 0.1);
   border-radius: 50%;
   filter: blur(4px);
   opacity: 0.3;

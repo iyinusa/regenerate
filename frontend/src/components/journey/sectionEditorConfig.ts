@@ -157,7 +157,7 @@ export const skillsConfig: SectionEditorConfig = {
   getItemTitle: (item) => item.name || item,
   getItemBadge: (item) => ({
     text: typeof item === 'string' ? 'Skill' : (item.category || 'Skill'),
-    color: '#00d4ff'
+    color: '#113493'
   }),
   createEmptyItem: () => ({
     id: '',

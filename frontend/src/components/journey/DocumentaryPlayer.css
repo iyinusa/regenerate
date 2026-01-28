@@ -8,7 +8,7 @@
   position: relative;
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(20, 20, 40, 0.5));
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
   /* Ensure it fits within parent's border-radius */
   border-radius: inherit;
 }
@@ -48,7 +48,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.8);
-  color: white;
+  color: var(--text-primary);
   z-index: 5;
 }
 
@@ -79,7 +79,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.8);
-  color: white;
+  color: var(--text-primary);
   text-align: center;
   z-index: 5;
 }
@@ -199,7 +199,7 @@
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(15px);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
 }
 
 .control-left,
@@ -219,7 +219,7 @@
 .control-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 8px;
   border-radius: 6px;
@@ -229,7 +229,7 @@
 
 .control-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: white;
+  color: var(--text-primary);
 }
 
 .fullscreen-btn {

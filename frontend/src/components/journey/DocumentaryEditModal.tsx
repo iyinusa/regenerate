@@ -137,7 +137,7 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
     <AnimatePresence>
       <div className="modal-backdrop" onClick={onClose}>
         <motion.div
-          className="documentary-edit-modal glass-morphism"
+          className="documentary-edit-modal"
           onClick={(e) => e.stopPropagation()}
           initial={{ opacity: 0, scale: 0.9, y: 50 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -372,11 +372,11 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
 
           {/* Modal Footer */}
           <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>
+            <button className="secondary-btn" onClick={onClose}>
               Cancel
             </button>
             <button 
-              className="btn btn-primary" 
+              className="primary-btn" 
               onClick={handleSave}
               disabled={calculateTotalDuration() > 141 || loading}
             >

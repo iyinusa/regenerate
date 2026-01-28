@@ -15,6 +15,7 @@ import DocumentarySection from '@/components/journey/DocumentarySection';
 import AuthModal from '@/components/AuthModal';
 import ProfileModal from '@/components/profile/ProfileModal';
 import './Journey.css';
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface ProfileData {
   name?: string;
@@ -118,7 +119,7 @@ const Journey: React.FC = () => {
     const jobId = searchParams.get('jobId');
     
     if (!jobId && !guestId && !username) {
-      setError('No job ID, guest ID, or username provided');
+      setError('No profile provided');
       setLoading(false);
       return;
     }
@@ -204,8 +205,8 @@ const Journey: React.FC = () => {
     };
   }, [searchParams, guestId]);
 
-  const handleAuthRequired = (action: string) => {
-    setAuthMessage(`Please sign in to ${action.toLowerCase()}`);
+  const handleAuthRequired = (action?: string) => {
+    setAuthMessage(`Please sign in to ${action?.toLowerCase()}`);
     setShowAuthModal(true);
   };
 
@@ -249,9 +250,64 @@ const Journey: React.FC = () => {
     return (
       <main className="journey-page loading">
         <JourneyBackground />
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading your immersive journey...</p>
+
+        <div className="shimmer-container">
+          {/* Hero skeleton */}
+          <div className="shimmer-section shimmer-hero" data-section="0">
+            <div className="shimmer-avatar" />
+            <div className="shimmer-hero-lines">
+              <div className="shimmer-line short" />
+              <div className="shimmer-line medium" />
+              <div className="shimmer-line long" />
+            </div>
+          </div>
+
+          {/* Two-column grid that mimics timeline + profile sections */}
+          <div className="shimmer-grid">
+            <div className="shimmer-section shimmer-chronicles" data-section="1">
+              <div className="shimmer-title" />
+              <div className="shimmer-timeline">
+                <div className="shimmer-event" />
+                <div className="shimmer-event short" />
+                <div className="shimmer-event long" />
+                <div className="shimmer-event" />
+              </div>
+            </div>
+
+            <div className="shimmer-section shimmer-cards" data-section="2">
+              <div className="shimmer-card">
+                <div className="shimmer-line medium" />
+                <div className="shimmer-line short" />
+                <div className="shimmer-line long" />
+              </div>
+              <div className="shimmer-card">
+                <div className="shimmer-line medium" />
+                <div className="shimmer-line short" />
+                <div className="shimmer-line long" />
+              </div>
+              <div className="shimmer-card">
+                <div className="shimmer-line medium" />
+                <div className="shimmer-line short" />
+                <div className="shimmer-line long" />
+              </div>
+            </div>
+          </div>
+
+          {/* Wide sections to represent skills/projects/education */}
+          <div className="shimmer-section shimmer-wide" data-section="3">
+            <div className="shimmer-title" />
+            <div className="shimmer-row">
+              <div className="shimmer-block" />
+              <div className="shimmer-block small" />
+              <div className="shimmer-block" />
+            </div>
+          </div>
+
+          {/* Documentary skeleton */}
+          <div className="shimmer-section shimmer-documentary" data-section="7">
+            <div className="shimmer-title" />
+            <div className="shimmer-line long" />
+          </div>
         </div>
       </main>
     );
@@ -269,17 +325,21 @@ const Journey: React.FC = () => {
   }
 
   return (
-    <main className="journey-page" ref={containerRef}>      {/* Auth Modal */}
+    <main className="journey-page" ref={containerRef}>
+      {/* Theme Toggle at top center */}
+      <ThemeToggle />
+
+      {/* Auth Modal */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         initialMode="login"
       />
-      
+
       {/* Auth message overlay */}
       {authMessage && (
         <div className="auth-message-overlay">
-          <div className="auth-message glass">
+          <div className="auth-message">
             <p>{authMessage}</p>
             <button className="submit-button" onClick={() => setAuthMessage('')}>Got it</button>
           </div>
@@ -293,24 +353,6 @@ const Journey: React.FC = () => {
         <button 
           className="profile-menu-btn"
           onClick={() => setShowProfileModal(true)}
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            zIndex: 100,
-            background: 'rgba(20, 20, 25, 0.6)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '50%',
-            width: '44px',
-            height: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'white',
-            backdropFilter: 'blur(10px)',
-            transition: 'all 0.2s ease'
-          }}
           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
           onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(20, 20, 25, 0.6)'}
           aria-label="Open Settings"
@@ -324,7 +366,7 @@ const Journey: React.FC = () => {
       )}
 
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
-      
+
       <div className="journey-content">
         {/* Hero Section */}
         <HeroSection 

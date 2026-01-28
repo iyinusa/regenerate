@@ -1,11 +1,11 @@
 :root {
-  --glass-bg: rgba(20, 20, 25, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --primary-gradient: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --error-color: #ff4d4d;
+  --glass-bg: var(--glass);
+  --glass-border: var(--glass-border);
+  --glass-shadow: 0 8px 32px 0 var(--accent-blue);
+  --primary-gradient: var(--gradient-primary);
+  --text-primary: var(--text-primary);
+  --text-secondary: var(--text-secondary);
+  --error-color: var(--accent-pink);
 }
 
 .auth-modal-overlay {
@@ -25,7 +25,7 @@
 }
 
 .auth-modal {
-  background: rgba(18, 18, 24, 0.85);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
@@ -73,7 +73,7 @@
 }
 
 .close-button {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass);
   border: none;
   color: var(--text-secondary);
   font-size: 1.5rem;
@@ -89,14 +89,14 @@
 }
 
 .close-button:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  background: var(--glass);
   transform: rotate(90deg);
 }
 
 .oauth-suggestion {
-  background: rgba(0, 198, 255, 0.1);
-  border: 1px solid rgba(0, 198, 255, 0.2);
+  background: var(--accent-blue);
+  border: 1px solid var(--accent-blue);
   border-radius: 12px;
   padding: 1rem;
   margin: 0 2rem 1.5rem;
@@ -120,7 +120,7 @@
   top: 55%;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -131,7 +131,7 @@
 }
 
 .password-toggle-btn:hover {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
 }
 
 .form-group label {
@@ -150,7 +150,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 0.85rem 1rem;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1rem;
   transition: all 0.2s ease;
 }
@@ -163,7 +163,8 @@
 }
 
 .form-group input::placeholder {
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary);
+  opacity: 0.5;
 }
 
 .error-message {
@@ -218,7 +219,7 @@
   display: flex;
   align-items: center;
   text-align: center;
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary);
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
   font-weight: 500;
@@ -298,7 +299,7 @@
 }
 
 .link-button:hover {
-  color: #fff;
+  color: var(--text-primary);
   text-decoration: underline;
 }
 

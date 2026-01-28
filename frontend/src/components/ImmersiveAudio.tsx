@@ -140,24 +140,24 @@ const ImmersiveAudio: React.FC<ImmersiveAudioProps> = ({ profile }) => {
           height: '44px',
           borderRadius: '50%',
           backgroundColor: audioError ? 'rgba(128, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.6)',
-          border: audioError ? '1px solid #ff4444' : '1px solid #00d4ff',
+          border: audioError ? '1px solid #ff4444' : '1px solid var(--accent-blue)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: (!audioLoaded && !audioError) ? 'wait' : audioError ? 'not-allowed' : 'pointer',
           backdropFilter: 'blur(5px)',
-          boxShadow: isPlaying ? '0 0 15px rgba(0, 212, 255, 0.6)' : 'none',
+          boxShadow: isPlaying ? '0 0 15px rgba(31, 74, 174, 0.6)' : 'none',
           transition: 'all 0.3s ease',
-          color: audioError ? '#ff4444' : isPlaying ? '#00d4ff' : '#aaaaaa',
+          color: audioError ? '#ff4444' : isPlaying ? 'var(--accent-blue)' : '#aaaaaa',
           opacity: (!audioLoaded && !audioError) ? 0.6 : 1,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0, 212, 255, 0.2)';
+          e.currentTarget.style.backgroundColor = 'rgba(31, 74, 174, 0.2)';
           e.currentTarget.style.color = '#ffffff';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
-          e.currentTarget.style.color = isPlaying ? '#00d4ff' : '#aaaaaa';
+          e.currentTarget.style.color = isPlaying ? 'var(--accent-blue)' : '#aaaaaa';
         }}
       >
         {!audioLoaded && !audioError ? (

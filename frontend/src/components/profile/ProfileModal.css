@@ -1,9 +1,9 @@
 :root {
-  --glass-bg: rgba(20, 20, 25, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --button-hover-bg: rgba(255, 255, 255, 0.1);
-  --input-bg: rgba(0, 0, 0, 0.3);
-  --input-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: var(--glass);
+  --glass-border: var(--glass-border);
+  --button-hover-bg: var(--glass);
+  --input-bg: var(--secondary-bg);
+  --input-border: var(--glass-border);
 }
 
 .profile-modal-overlay {
@@ -23,7 +23,7 @@
 }
 
 .profile-modal {
-  background: rgba(18, 18, 24, 0.95);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
@@ -38,14 +38,14 @@
   position: relative;
   overflow: hidden;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .profile-modal-header {
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--secondary-bg);
   padding-top: 20px;
 }
 
@@ -59,7 +59,7 @@
 .profile-modal-title {
   font-size: 1.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #fff 0%, #a0a0a0 100%);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 0;
@@ -68,7 +68,7 @@
 .profile-close-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
@@ -79,8 +79,8 @@
 }
 
 .profile-close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--button-hover-bg);
+  color: var(--text-primary);
 }
 
 .profile-tabs {
@@ -99,7 +99,7 @@
   padding: 12px 4px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 500;
@@ -109,7 +109,7 @@
 }
 
 .profile-tab:hover {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .profile-tab.active {
@@ -142,7 +142,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 16px;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   border-left: 3px solid #00c6ff;
   padding-left: 12px;
 }
@@ -152,13 +152,14 @@
   position: relative;
 }
 
+
 .password-toggle-btn {
   position: absolute;
   right: 12px;
   top: 55%;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -169,14 +170,14 @@
 }
 
 .password-toggle-btn:hover {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .form-label {
   display: block;
   margin-bottom: 8px;
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .form-input {
@@ -185,7 +186,7 @@
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.95rem;
   transition: all 0.2s;
 }
@@ -233,8 +234,8 @@
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
 }
 
 .btn-secondary:hover {

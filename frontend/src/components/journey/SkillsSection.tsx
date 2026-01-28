@@ -4,6 +4,8 @@ import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler,
 import { Radar } from 'react-chartjs-2';
 import './SkillsSection.css';
 
+import { useTheme } from '../../hooks/useTheme';
+
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 interface SkillsSectionProps {
@@ -26,6 +28,14 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
   const carouselRef = useRef<HTMLDivElement>(null);
   const spinContainerRef = useRef<HTMLDivElement>(null);
   const [isCarouselReady, setIsCarouselReady] = useState(false);
+
+  // Get current theme
+  const { theme } = useTheme();
+
+  const isLightTheme = theme === 'light';
+  const radarColor = isLightTheme ? '#030308' : '#ffffff';
+  const radarHex = isLightTheme ? '0, 0, 0' : '255, 255, 255';
+  const radarTooltip = isLightTheme ? '#ffffff' : '#030308';
 
   // Debug logging to help troubleshoot
   useEffect(() => {
@@ -71,13 +81,13 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
         {
           label: 'Domain Proficiency',
           data: allDomains.map(domain => skillProficiencyScores.scores[domain] || 0),
-          backgroundColor: 'rgba(0, 212, 255, 0.2)',
-          borderColor: 'rgba(0, 212, 255, 1)',
+          backgroundColor: 'rgba(31, 74, 174, 0.2)',
+          borderColor: 'rgba(31, 74, 174, 1)',
           borderWidth: 2,
-          pointBackgroundColor: 'rgba(0, 212, 255, 1)',
-          pointBorderColor: '#fff',
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: 'rgba(0, 212, 255, 1)',
+          pointBackgroundColor: 'rgba(31, 74, 174, 1)',
+          pointBorderColor: radarColor,
+          pointHoverBackgroundColor: radarColor,
+          pointHoverBorderColor: 'rgba(31, 74, 174, 1)',
         },
       ],
     };
@@ -114,13 +124,13 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
         {
           label: `${selectedDomain} Skills`,
           data: skillsForRadar.map(s => s.score),
-          backgroundColor: 'rgba(0, 212, 255, 0.2)',
-          borderColor: 'rgba(0, 212, 255, 1)',
+          backgroundColor: 'rgba(31, 74, 174, 0.2)',
+          borderColor: 'rgba(31, 74, 174, 1)',
           borderWidth: 2,
-          pointBackgroundColor: 'rgba(0, 212, 255, 1)',
-          pointBorderColor: '#fff',
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: 'rgba(0, 212, 255, 1)',
+          pointBackgroundColor: 'rgba(31, 74, 174, 1)',
+          pointBorderColor: radarColor,
+          pointHoverBackgroundColor: radarColor,
+          pointHoverBorderColor: 'rgba(31, 74, 174, 1)',
         },
       ],
     };
@@ -144,10 +154,10 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
         display: false,
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#00d4ff',
-        bodyColor: '#fff',
-        borderColor: '#00d4ff',
+        backgroundColor: radarTooltip,
+        titleColor: '#5c83ef',
+        bodyColor: radarColor,
+        borderColor: '#5c83ef',
         borderWidth: 1,
         callbacks: {
           label: function(context: any) {
@@ -191,13 +201,13 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
         min: 0,
         max: 100,
         angleLines: {
-          color: 'rgba(255, 255, 255, 0.1)',
+          color: `rgba(${radarHex}, 0.1)`,
         },
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
+          color: `rgba(${radarHex}, 0.1)`,
         },
         pointLabels: {
-          color: 'rgba(255, 255, 255, 0.8)',
+          color: `rgba(${radarHex}, 0.8)`,
           font: {
             size: radarView === 'domains' ? 14 : 11,
             weight: radarView === 'domains' ? 'bold' as const : 'normal' as const,
@@ -206,7 +216,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
         ticks: {
           display: true,
           backdropColor: 'transparent',
-          color: 'rgba(255, 255, 255, 0.5)',
+          color: `rgba(${radarHex}, 0.5)`,
           stepSize: 20,
         },
       },
@@ -386,11 +396,11 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                   }}
                   className="glass-btn"
                   style={{
-                    background: 'rgba(0, 212, 255, 0.1)',
-                    border: '1px solid rgba(0, 212, 255, 0.3)',
+                    background: 'rgba(31, 74, 174, 0.1)',
+                    border: '1px solid rgba(31, 74, 174, 0.3)',
                     borderRadius: '8px',
                     padding: '6px 12px',
-                    color: '#00d4ff',
+                    color: '#113493',
                     cursor: 'pointer',
                     fontSize: '13px',
                     display: 'flex',
@@ -408,8 +418,8 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                 onClick={() => setIs3DMode(!is3DMode)}
                 className="glass-btn"
                 style={{
-                  background: is3DMode ? 'rgba(0, 212, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                  border: is3DMode ? '1px solid #00d4ff' : '1px solid rgba(255, 255, 255, 0.2)',
+                  background: is3DMode ? 'rgba(31, 74, 174, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  border: is3DMode ? '1px solid #113493' : '1px solid rgba(255, 255, 255, 0.2)',
                   borderRadius: '8px',
                   padding: '6px 12px',
                   color: is3DMode ? '#fff' : 'rgba(255, 255, 255, 0.7)',
@@ -427,7 +437,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
           </div>
 
           {radarView === 'domains' && !is3DMode && (
-            <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '1rem', marginTop: '-0.5rem' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: '-0.5rem' }}>
               Click on any domain to view individual skills
             </p>
           )}
@@ -463,7 +473,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                       </div>
                       <h4 className="skill-card-title">{item.label}</h4>
                       <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', margin: '8px 0', overflow: 'hidden' }}>
-                        <div style={{ width: `${item.score}%`, height: '100%', background: '#00d4ff' }}></div>
+                        <div style={{ width: `${item.score}%`, height: '100%', background: '#113493' }}></div>
                       </div>
                       <p className="skill-card-score">{Math.round(item.score)}% Proficiency</p>
                       {item.type === 'domain' && (

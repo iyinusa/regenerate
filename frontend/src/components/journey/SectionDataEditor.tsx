@@ -182,7 +182,7 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
         onClick={handleClose}
       >
         <motion.div
-          className="section-editor-modal glass"
+          className="section-editor-modal"
           initial={{ opacity: 0, scale: 0.5, y: 50 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.5, y: 20 }}
@@ -234,13 +234,12 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
                     <h3>{config.displayName} ({items.length})</h3>
                     <button 
                       onClick={handleCreateItem}
-                      className="create-item-btn primary-btn"
+                      className="primary-btn create-item-btn"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                       </svg>
-                      Add {config.itemName}
                     </button>
                   </div>
 
@@ -262,6 +261,7 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
                                 {badge.text}
                               </div>
                             )}
+                            {item.date && <div className="item-date">{item.date}</div>}
                             <div className="item-actions">
                               <button 
                                 onClick={() => handleEditItem(item)}
@@ -303,7 +303,6 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
                                 ))}
                               </div>
                             )}
-                            {item.date && <div className="item-date">{item.date}</div>}
                           </div>
                         </div>
                       );
@@ -312,21 +311,23 @@ const SectionDataEditor: React.FC<SectionDataEditorProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="modal-actions">
-                  <button 
-                    onClick={handleClose} 
-                    className="secondary-btn"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={saveItems} 
-                    className="primary-btn"
-                    disabled={loading}
-                  >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </button>
+                <div className='section-editor-footer'>
+                  <div className="modal-actions">
+                    <button 
+                      onClick={handleClose} 
+                      className="secondary-btn"
+                      disabled={loading}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={saveItems} 
+                      className="primary-btn"
+                      disabled={loading}
+                    >
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (

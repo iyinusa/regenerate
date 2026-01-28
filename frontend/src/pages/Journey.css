@@ -3,8 +3,8 @@
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background-color: #050510;
-  color: #fff;
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
   overflow-x: hidden;
   scroll-behavior: smooth;
   /* Enhanced for cinematic experience */
@@ -17,9 +17,10 @@
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  width: 100%;
+  height: 100%;
+  background: var(--glass);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,8 +29,9 @@
 }
 
 .auth-message {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  position: fixed;
+  background: var(--secondary-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   padding: 2rem;
   text-align: center;
@@ -39,29 +41,30 @@
 
 .auth-message p {
   margin: 0 0 1.5rem 0;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   font-size: 16px;
 }
 
 .auth-message button {
-  border: none;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
   border-radius: 6px;
   padding: 0.75rem 1.5rem;
-  color: white;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
-
 .auth-message button:hover {
+  color: var(--text-secondary);
   transform: translateY(-1px);
 }
 
 /* Three.js Background Container - same as Home page */
+
 .journey-page .three-container,
 .journey-bg {
-  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -77,13 +80,7 @@
   height: 100%;
 }
 
-.journey-page.loading,
-.journey-page.error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-}
+
 
 .loading-container,
 .error-container {
@@ -94,9 +91,9 @@
 
 .loading-spinner {
   width: 60px;
-  height: 60px;
+  color: var(--text-secondary);
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #00d4ff;
+  border-top-color: var(--accent-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -113,7 +110,7 @@ h2 {
 .loading-container p,
 .error-container p {
   font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   margin-top: 1rem;
 }
 
@@ -121,6 +118,25 @@ h2 {
   font-size: 2rem;
   margin-bottom: 1rem;
   color: #ff4444;
+}
+
+.profile-menu-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  background: rgba(20, 20, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
 }
 
 /* Journey Content */
@@ -131,6 +147,7 @@ h2 {
 }
 
 /* Enhanced Journey Sections with Cinematic Effects */
+
 .journey-section {
   min-height: 100vh;
   padding: 6rem 2rem;
@@ -140,12 +157,10 @@ h2 {
   position: relative;
   opacity: 0;
   transform: translateY(50px) scale(0.95);
-  transition: 
-    opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  /* Performance optimization */
+  transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: opacity, transform;
 }
+
 
 .journey-section.visible {
   opacity: 1;
@@ -159,7 +174,7 @@ h2 {
   background: 
     radial-gradient(
       ellipse at 50% 20%,
-      rgba(0, 212, 255, 0.1) 0%,
+      rgba(31, 74, 174, 0.1) 0%,
       rgba(123, 47, 247, 0.05) 40%,
       transparent 70%
     ),
@@ -177,7 +192,7 @@ h2 {
     background: 
       radial-gradient(
         ellipse at 50% 20%,
-        rgba(0, 212, 255, 0.1) 0%,
+        rgba(31, 74, 174, 0.1) 0%,
         rgba(123, 47, 247, 0.05) 40%,
         transparent 70%
       ),
@@ -256,14 +271,14 @@ h2 {
 }
 
 .nav-dot.active {
-  background: linear-gradient(135deg, #00d4ff, #7b2ff7);
-  border-color: #00d4ff;
-  box-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+  background: linear-gradient(135deg, var(--accent-blue), #7b2ff7);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(31, 74, 174, 0.6);
 }
 
 /* Gradient Text */
 .gradient-text {
-  background: linear-gradient(135deg, #00d4ff, #7b2ff7, #ff2e97);
+  background: linear-gradient(135deg, var(--accent-blue), #7b2ff7, #ff2e97);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -279,8 +294,8 @@ h2 {
 /* Enhanced Cinematic Glow Effects */
 .glow-text {
   text-shadow: 
-    0 0 10px rgba(0, 212, 255, 0.8),
-    0 0 20px rgba(0, 212, 255, 0.6),
+    0 0 10px rgba(31, 74, 174, 0.8),
+    0 0 20px rgba(31, 74, 174, 0.6),
     0 0 40px rgba(123, 47, 247, 0.4),
     0 0 80px rgba(255, 46, 151, 0.2);
   animation: textGlow 4s ease-in-out infinite alternate;
@@ -289,14 +304,14 @@ h2 {
 @keyframes textGlow {
   0% {
     text-shadow: 
-      0 0 10px rgba(0, 212, 255, 0.8),
-      0 0 20px rgba(0, 212, 255, 0.6),
+      0 0 10px rgba(31, 74, 174, 0.8),
+      0 0 20px rgba(31, 74, 174, 0.6),
       0 0 40px rgba(123, 47, 247, 0.4);
   }
   100% {
     text-shadow: 
-      0 0 15px rgba(0, 212, 255, 1.0),
-      0 0 30px rgba(0, 212, 255, 0.8),
+      0 0 15px rgba(31, 74, 174, 1.0),
+      0 0 30px rgba(31, 74, 174, 0.8),
       0 0 60px rgba(123, 47, 247, 0.6),
       0 0 120px rgba(255, 46, 151, 0.3);
   }
@@ -304,7 +319,7 @@ h2 {
 
 .card-glow {
   box-shadow: 
-    0 8px 32px rgba(0, 212, 255, 0.15),
+    0 8px 32px rgba(31, 74, 174, 0.15),
     0 0 60px rgba(123, 47, 247, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.2);
@@ -314,12 +329,12 @@ h2 {
 @keyframes cardGlow {
   0% {
     box-shadow: 
-      0 8px 32px rgba(0, 212, 255, 0.15),
+      0 8px 32px rgba(31, 74, 174, 0.15),
       0 0 60px rgba(123, 47, 247, 0.1);
   }
   100% {
     box-shadow: 
-      0 12px 48px rgba(0, 212, 255, 0.25),
+      0 12px 48px rgba(31, 74, 174, 0.25),
       0 0 80px rgba(123, 47, 247, 0.2),
       0 0 120px rgba(255, 46, 151, 0.1);
   }
@@ -327,7 +342,8 @@ h2 {
 
 /* Enhanced Glass Morphism with Cinematic Effects */
 .glass {
-  background: rgba(255, 255, 255, 0.08);
+  /* background: rgba(255, 255, 255, 0.08); */
+  background: var(--glass);
   backdrop-filter: blur(15px) saturate(180%);
   -webkit-backdrop-filter: blur(15px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -370,7 +386,7 @@ h2 {
 .cinematic-shadow {
   box-shadow: 
     0 20px 40px -12px rgba(0, 0, 0, 0.7),
-    0 0 60px rgba(0, 212, 255, 0.1),
+    0 0 60px rgba(31, 74, 174, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
@@ -387,7 +403,7 @@ h2 {
   bottom: -50%;
   background: radial-gradient(
     circle at center,
-    rgba(0, 212, 255, 0.1) 0%,
+    rgba(31, 74, 174, 0.1) 0%,
     rgba(123, 47, 247, 0.05) 50%,
     transparent 100%
   );
@@ -402,8 +418,21 @@ h2 {
 }
 
 .atmospheric-glow {
-  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.3))
+  filter: drop-shadow(0 0 20px rgba(31, 74, 174, 0.3))
           drop-shadow(0 0 40px rgba(123, 47, 247, 0.2));
+}
+
+.edit-section-btn {
+  background: rgba(31, 74, 174, 0.15);
+  border: 1px solid rgba(31, 74, 174, 0.3);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--accent-blue);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Mobile Responsive */
@@ -476,3 +505,105 @@ h2 {
 .animate-scale-in {
   animation: scaleIn 0.6s ease forwards;
 }
+
+/* Shimmer / Skeleton styles for loading state that mirror Journey layout */
+.shimmer-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 6rem auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.shimmer-section {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.shimmer-hero {
+  align-items: center;
+}
+
+.shimmer-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-hero-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.shimmer-line {
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.shimmer-line.short { width: 20%; height: 12px; }
+.shimmer-line.medium { width: 40%; }
+.shimmer-line.long { width: 80%; }
+
+.shimmer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.shimmer-title { height: 20px; width: 35%; border-radius: 8px; }
+
+.shimmer-timeline { display:flex; flex-direction:column; gap:0.8rem; padding-top:0.5rem; }
+.shimmer-event { height: 12px; width: 85%; border-radius: 8px; }
+.shimmer-event.short { width: 55%; }
+.shimmer-event.long { width: 95%; }
+
+.shimmer-cards { display:flex; flex-direction:column; gap:1rem; }
+.shimmer-card { background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 12px; display:flex; flex-direction:column; gap:0.6rem; }
+
+.shimmer-wide .shimmer-row { display:flex; gap:1rem; margin-top:0.8rem; }
+.shimmer-block { flex:1; height: 72px; border-radius: 10px; }
+.shimmer-block.small { flex:0.6; height: 56px; }
+
+.shimmer-documentary { flex-direction:column; gap:0.8rem; }
+
+/* Reuse shimmer animation on elements */
+.shimmer-avatar::after,
+.shimmer-line,
+.shimmer-event,
+.shimmer-block,
+.shimmer-title {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: inherit;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (max-width: 900px) {
+  .shimmer-grid { grid-template-columns: 1fr; }
+  .shimmer-avatar { width: 88px; height: 88px; }
+  .shimmer-container { margin: 3rem 1rem; }
+}
+

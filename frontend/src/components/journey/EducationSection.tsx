@@ -52,7 +52,7 @@ const EducationSection: React.FC<EducationSectionProps> = ({
               height: Math.random() * 100 + 50,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              background: i % 2 === 0 ? 'rgba(0, 212, 255, 0.05)' : 'rgba(153, 51, 255, 0.05)',
+              background: i % 2 === 0 ? 'rgba(31, 74, 174, 0.05)' : 'rgba(153, 51, 255, 0.05)',
             }}
             animate={{
               y: [0, -100, 0],
@@ -86,15 +86,6 @@ const EducationSection: React.FC<EducationSectionProps> = ({
               onClick={handleOpenEditModal}
               className="edit-section-btn"
               title="Edit Education"
-              style={{
-                background: 'rgba(0, 212, 255, 0.15)',
-                border: '1px solid rgba(0, 212, 255, 0.3)',
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: '#00d4ff',
-                zIndex: 20
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m18 2 4 4-5.5 5.5-4-4L18 2z"></path>
@@ -113,7 +104,7 @@ const EducationSection: React.FC<EducationSectionProps> = ({
             educationList.map((edu: any, index: number) => (
               <motion.div
                 key={index}
-                className="education-card-3d"
+                className="education-card-3d glass"
                 initial={{ opacity: 0, y: 50, rotateX: 10 }}
                 whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
@@ -126,7 +117,7 @@ const EducationSection: React.FC<EducationSectionProps> = ({
                     </span>
                     <h3 className="edu-institution">{edu.institution}</h3>
                     <div className="edu-degree">
-                      {edu.degree} • <span style={{ color: '#00d4ff' }}>{edu.field}</span>
+                      {edu.degree} in <span>{edu.field}</span>
                     </div>
                   </div>
                   

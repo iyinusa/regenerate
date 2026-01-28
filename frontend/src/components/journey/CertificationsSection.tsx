@@ -59,15 +59,6 @@ const CertificationsSection: React.FC<CertificationsSectionProps> = ({
               onClick={handleOpenEditModal}
               className="edit-section-btn"
               title="Edit Certifications"
-              style={{
-                background: 'rgba(255, 215, 0, 0.15)',
-                border: '1px solid rgba(255, 215, 0, 0.3)',
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: '#FFD700',
-                zIndex: 20
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m18 2 4 4-5.5 5.5-4-4L18 2z"></path>
@@ -86,7 +77,7 @@ const CertificationsSection: React.FC<CertificationsSectionProps> = ({
             certifications.map((cert, index) => (
               <motion.div
                 key={index}
-                className="cert-card"
+                className="cert-card glass"
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}

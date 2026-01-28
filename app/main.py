@@ -169,7 +169,7 @@ async def serve_frontend():
                     margin: 0 auto;
                 }
                 .gradient-text {
-                    background: linear-gradient(135deg, #00d4ff, #7c3aed);
+                    background: linear-gradient(135deg, var(--accent-blue), #7c3aed);
                     -webkit-background-clip: text;
                     background-clip: text;
                     -webkit-text-fill-color: transparent;
@@ -180,12 +180,12 @@ async def serve_frontend():
                     background: #1a1a2e;
                     padding: 4px 8px;
                     border-radius: 4px;
-                    color: #00d4ff;
+                    color: var(--accent-blue);
                     font-family: monospace;
                 }
                 .info-box {
-                    background: rgba(0, 212, 255, 0.1);
-                    border: 1px solid #00d4ff;
+                    background: rgba(31, 74, 174, 0.1);
+                    border: 1px solid var(--accent-blue);
                     border-radius: 10px;
                     padding: 20px;
                     margin: 20px 0;
@@ -216,7 +216,7 @@ npm run build</code></pre>
                 </div>
                 
                 <p style="margin-top: 40px;">
-                    <a href="/docs" style="color: #00d4ff; text-decoration: none; font-weight: 600;">📚 View API Documentation</a>
+                    <a href="/docs" style="color: var(--accent-blue); text-decoration: none; font-weight: 600;">📚 View API Documentation</a>
                 </p>
             </div>
         </body>

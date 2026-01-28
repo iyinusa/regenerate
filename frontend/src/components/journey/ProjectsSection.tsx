@@ -274,24 +274,12 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 onClick={handleOpenEditModal}
                 className="edit-section-btn"
                 title="Edit Achievements"
-                style={{
-                  background: 'rgba(0, 212, 255, 0.15)',
-                  border: '1px solid rgba(0, 212, 255, 0.3)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                  color: '#00d4ff',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.25)';
+                  e.currentTarget.style.background = 'rgba(31, 74, 174, 0.25)';
                   e.currentTarget.style.transform = 'scale(1.05)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 212, 255, 0.15)';
+                  e.currentTarget.style.background = 'rgba(31, 74, 174, 0.15)';
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >

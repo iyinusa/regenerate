@@ -242,14 +242,36 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({
         const context = canvas.getContext('2d');
         canvas.width = 512;
         canvas.height = 128;
-        if(context) {
-            context.fillStyle = 'rgba(0,0,0,0)'; // Transparent
-            context.fillRect(0, 0, 512, 128);
-            // Use system fonts with emoji support
-            context.font = 'Bold 40px -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", Arial, sans-serif';
-            context.fillStyle = '#efefef';
-            context.textAlign = 'center';
-            context.fillText(text, 256, 80);
+        if (context) {
+          // Transparent
+          context.fillStyle = 'rgba(0,0,0,0)';
+          context.fillRect(0, 0, 512, 128);
+          
+          // Use system fonts with emoji support
+          context.font = 'Bold 50px "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", Arial, sans-serif';
+          context.textBaseline = 'middle';
+          context.textAlign = 'center';
+
+          const x = canvas.width / 2;
+          const y = canvas.height / 2;
+
+          // ---- SHADOW ----
+          context.shadowColor = 'rgba(0, 0, 0, 0.6)';
+          context.shadowBlur = 6;
+          context.shadowOffsetX = 2;
+          context.shadowOffsetY = 2;
+
+          // ---- OUTLINE ----
+          context.lineWidth = 4;
+          context.strokeStyle = '#000000';
+          context.strokeText(text, x, y);
+
+          // ---- FILL ----
+          context.fillStyle = '#ffffff';
+          context.fillText(text, x, y);
+          
+          // Reset shadow so it doesn’t affect anything else
+          context.shadowColor = 'transparent';
         }
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
@@ -404,7 +426,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({
   const y = useTransform(scrollY, [0, 350], [0, 50]);
 
   return (
-    <section className="journey-section timeline-section" style={{ height: '100vh', position: 'relative', overflow: 'hidden' }} data-section={_sectionIndex}>
+    <section className="journey-section timeline-section" data-section={_sectionIndex}>
       <motion.div 
           ref={containerRef} 
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1, outline: 'none', opacity, scale, y }}></motion.div>
@@ -420,24 +442,12 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({
               onClick={handleOpenEditModal}
               className="edit-section-btn"
               title="Edit Chronicles"
-              style={{
-                background: 'rgba(0, 212, 255, 0.15)',
-                border: '1px solid rgba(0, 212, 255, 0.3)',
-                borderRadius: '8px',
-                padding: '8px',
-                cursor: 'pointer',
-                color: '#00d4ff',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 212, 255, 0.25)';
+                e.currentTarget.style.background = 'rgba(31, 74, 174, 0.25)';
                 e.currentTarget.style.transform = 'scale(1.05)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 212, 255, 0.15)';
+                e.currentTarget.style.background = 'rgba(31, 74, 174, 0.15)';
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
@@ -448,7 +458,7 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({
             </button>
           )}
         </div>
-        <p className="section-subtitle" style={{ fontSize: '1rem', opacity: 0.8, marginBottom: '3rem' }}>Drag to explore • Tap nodes for details</p>
+        <p className="section-subtitle">Drag to explore • Tap nodes for details</p>
       </div>
 
       {/* Details Popup */}
@@ -460,45 +470,23 @@ const TimelineSection: React.FC<TimelineSectionProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0, borderRadius: '16px' }}
             exit={{ opacity: 0, scale: 0.5, y: 20, borderRadius: '50%' }}
             transition={{ type: "spring", damping: 45, stiffness: 100 }}
-            style={{
-                position: 'absolute',
-                top: '35%',
-                left: '8%',
-                transform: 'translate(-35%, -8%)',
-                width: '85%',
-                maxWidth: '450px',
-                padding: '2.5rem',
-                zIndex: 10,
-                background: 'rgba(0, 0, 0, 0.08)',
-                border: '1px solid rgba(80, 200, 255, 0.25)',
-                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 200, 255, 0.1)',
-                backdropFilter: 'blur(25px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(25px) saturate(180%)',
-            }}
           >
-            <button 
-                onClick={(e) => { e.stopPropagation(); setActiveEvent(null); }}
-                style={{ 
-                    position: 'absolute', top: '15px', right: '15px', 
-                    background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-                    width: '30px', height: '30px',
-                    color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}
-            >
+            <button className='close-btn' onClick={(e) => { e.stopPropagation(); setActiveEvent(null); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             </button>
-            <div className="event-date" style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
-                {new Date(activeEvent.start_date || activeEvent.date).getFullYear()}
+            <div className="event-date">
+              {new Date(activeEvent.start_date || activeEvent.date).getFullYear()} 
+              <span>{activeEvent.category}</span>
             </div>
-            <h3 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '1rem', background: 'linear-gradient(to right, #fff, #88ccff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {activeEvent.title || activeEvent.name}
-            </h3>
-            <p style={{ lineHeight: 1.7, color: '#d0d0d0', fontSize: '1rem' }}>
-                {activeEvent.description || activeEvent.content}
-            </p>
+            <h3>{activeEvent.title || activeEvent.name}</h3>
+            <h5>{activeEvent.subtitle}</h5>
+            <p>{activeEvent.description || activeEvent.content}</p>
+            <div className='item-tags'>
+              {activeEvent.tags.map((tag: string) => <span key={tag} className='item-tag'>{tag}</span>)}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

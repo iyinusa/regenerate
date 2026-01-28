@@ -47,7 +47,7 @@
   font-family: 'Nunito Sans', sans-serif;
   font-size: clamp(0.6rem, 1.5vw, 1.2rem);
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
   letter-spacing: 0.05em;
   margin: 0;
   text-align: left;
@@ -64,10 +64,10 @@
   font-size: 1.1rem;
   font-weight: 500;
   border-radius: 50px; /* Pill shape */
-  background: rgba(255, 255, 255, 0.05); /* Glass effect base */
+  background: var(--glass);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
   max-width: 400px;
 }
 
@@ -77,7 +77,7 @@
 
 .quote-mark-left,
 .quote-mark-right {
-  color: #00d4ff;
+  color: var(--accent-blue);
   font-family: 'Nunito Sans', sans-serif;
   font-size: 1.5rem;
   line-height: 1;
@@ -111,9 +111,9 @@
   align-items: flex-start; /* Align text to top-left usually looks better for long text */
   justify-content: flex-start;
   text-align: left;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
   overflow-y: auto; /* In case content is too long */
   max-height: 600px;
 }
@@ -121,7 +121,7 @@
 .narrative-content {
   font-size: 1.1rem;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
 }
 
 /* Video Box */
@@ -130,7 +130,7 @@
   overflow: hidden;
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -147,7 +147,7 @@
   margin-top: auto;
   padding-bottom: 2rem;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -166,7 +166,7 @@
 .scroll-wheel {
   width: 4px;
   height: 8px;
-  background: #00d4ff; /* Kept the blue accent color */
+  background: #113493; /* Kept the blue accent color */
   border-radius: 2px;
   margin-top: 8px;
   animation: scroll 1.5s infinite;

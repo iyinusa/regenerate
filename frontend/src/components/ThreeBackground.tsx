@@ -100,7 +100,7 @@ const ThreeBackground: React.FC = () => {
       // Colors (blue to purple to pink gradient)
       const color = new THREE.Color();
       const rand = Math.random();
-      if (rand < 0.33) color.setHex(0x00d4ff); // blue
+      if (rand < 0.33) color.setHex(0x113493); // blue
       else if (rand < 0.66) color.setHex(0x7c3aed); // purple
       else color.setHex(0xec4899); // pink
       
@@ -136,7 +136,7 @@ const ThreeBackground: React.FC = () => {
 
     shapes.forEach((geometry, index) => {
       const material = new THREE.MeshBasicMaterial({
-        color: index % 2 === 0 ? 0x00d4ff : 0x7c3aed,
+        color: index % 2 === 0 ? 0x113493 : 0x7c3aed,
         wireframe: true,
         transparent: true,
         opacity: 0.3
