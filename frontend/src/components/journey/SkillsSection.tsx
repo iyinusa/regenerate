@@ -396,8 +396,8 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                   }}
                   className="glass-btn"
                   style={{
-                    background: 'rgba(31, 74, 174, 0.1)',
-                    border: '1px solid rgba(31, 74, 174, 0.3)',
+                    background: `rgba(${radarHex}, 0.1)`,
+                    border: `1px solid rgba(${radarHex}, 0.3)`,
                     borderRadius: '8px',
                     padding: '6px 12px',
                     color: '#113493',
@@ -418,11 +418,11 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                 onClick={() => setIs3DMode(!is3DMode)}
                 className="glass-btn"
                 style={{
-                  background: is3DMode ? 'rgba(31, 74, 174, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                  border: is3DMode ? '1px solid #113493' : '1px solid rgba(255, 255, 255, 0.2)',
+                  background: is3DMode ? `rgba(${radarHex}, 0.3)` : 'rgba(255, 255, 255, 0.1)',
+                  border: is3DMode ? `1px solid rgba(${radarHex}, 0.7)` : '1px solid rgba(255, 255, 255, 0.2)',
                   borderRadius: '8px',
                   padding: '6px 12px',
-                  color: is3DMode ? '#fff' : 'rgba(255, 255, 255, 0.7)',
+                  color: `rgba(${radarHex}, 0.7)`,
                   cursor: 'pointer',
                   fontSize: '13px',
                   display: 'flex',

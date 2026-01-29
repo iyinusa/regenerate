@@ -309,7 +309,7 @@
 
 .learnings-title {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-primary);
   font-weight: 600;
   margin-bottom: 0.75rem;
   text-transform: uppercase;
@@ -324,7 +324,7 @@
 
 .chapter-learnings li {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-primary);
   padding-left: 1.2rem;
   position: relative;
   margin-bottom: 0.5rem;
