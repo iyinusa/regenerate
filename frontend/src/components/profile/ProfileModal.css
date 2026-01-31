@@ -302,7 +302,7 @@
 
 .status-badge.connected {
   background: rgba(76, 175, 80, 0.2);
-  color: #81c784;
+  color: var(--accent-blue);
 }
 
 .btn-connect {
@@ -382,7 +382,7 @@
 }
 
 .domain-prefix {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-secondary);
     font-size: 0.95rem;
     white-space: nowrap;
 }
@@ -450,11 +450,11 @@
 }
 
 input:checked + .slider {
-  background-color: #4CAF50;
+  background-color: var(--accent-blue);
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #4CAF50;
+  box-shadow: 0 0 1px var(--accent-blue);
 }
 
 input:checked + .slider:before {
@@ -472,7 +472,7 @@ input:checked + .slider:before {
 }
 
 .public-link {
-    color: #81c784;
+    color: var(--text-primary);
     text-decoration: none;
     flex: 1;
     display: flex;
@@ -489,7 +489,7 @@ input:checked + .slider:before {
 .copy-btn {
     background: rgba(255, 255, 255, 0.1);
     border: none;
-    color: white;
+    color: var(--text-primary);
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -537,6 +537,6 @@ input:checked + .slider:before {
 }
 
 .section-item input:checked ~ .visibility-label {
-    color: #4CAF50;
+    color: var(--accent-blue);
     font-weight: 600;
 }

@@ -76,7 +76,7 @@
 .user-info {
 	color: var(--text-primary);
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	gap: 0.5rem;
 }
 
@@ -143,6 +143,10 @@
 	color: #ff5f56;
 }
 
+.hero-logo {
+	width: 120px;
+}
+
 /* Responsive adjustments for auth section */
 @media (max-width: 768px) {
 	.auth-section {
@@ -194,12 +198,11 @@
 .mhero-title {
 	font-family: 'Nunito Sans', sans-serif;
 	font-size: clamp(3rem, 7vw, 5rem);
-	font-weight: 900;
+	font-weight: 700;
 	line-height: 0.9;
 	margin-top: 3rem;
 	margin-bottom: 3rem;
 	color: var(--text-primary);
-	letter-spacing: -0.05em;
 }
 
 .gradient-text {
@@ -211,13 +214,13 @@
 
 .mhero-subtitle {
 	font-family: 'Nunito Sans', sans-serif;
-	font-size: 1.5rem;
+	font-size: 1.2rem;
 	line-height: 1.4;
 	color: var(--text-secondary);
 	max-width: 700px;
-	margin-top: 6rem;
-	margin-bottom: 6rem;
-	font-weight: 400;
+	margin-top: 4rem;
+	margin-bottom: 2rem;
+	font-weight: 200;
 }
 
 .highlight {
@@ -334,10 +337,11 @@
 	font-weight: 700;
 }
 
-.oauth-buttons {
+.hero-content .oauth-buttons {
 	display: flex;
 	gap: 1rem;
 	flex-wrap: wrap;
+	flex-direction: row !important;
 }
 
 .oauth-btn {

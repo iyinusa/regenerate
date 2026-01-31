@@ -102,7 +102,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="auth-modal-overlay">
-      <div className="auth-modal glass">
+      <div className="auth-modal">
         <div className="auth-modal-header">
           <h2>{mode === 'login' ? 'Sign In' : 'Create Account'}</h2>
           <button className="close-button" onClick={onClose}>×</button>

@@ -277,6 +277,9 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
             </div>
           </div>
 
+          {/* Logo */}
+          <img src="/favicon.png" alt="Logo" className="hero-logo" />
+
           <h1 ref={titleRef} className="mhero-title">
             REGENERATE <br />
             <span className="gradient-text">YOUR JOURNEY</span>

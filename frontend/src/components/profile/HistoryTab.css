@@ -25,8 +25,8 @@
 }
 
 .history-item.default-history {
-  border-color: var(--accent-blue);
-  background: var(--accent-blue);
+  border-color: var(--glass-border);
+  background: var(--glass);
 }
 
 .history-info {
@@ -62,7 +62,7 @@
 
 .default-badge {
   font-size: 0.7rem;
-  background: var(--accent-blue);
+  background: var(--glass);
   color: var(--accent-blue);
   padding: 2px 8px;
   border-radius: 10px;
@@ -111,11 +111,11 @@
 }
 
 .load-btn {
-  background: var(--accent-blue);
-  color: var(--accent-blue);
+  background: var(--glass);
+  color: var(--text-primary);
 }
 .load-btn:hover:not(:disabled) {
-  background: var(--accent-blue);
+  background: var(--text-secondary);
 }
 
 .make-default-btn {
@@ -125,10 +125,10 @@
 
 .delete-btn {
   background: var(--accent-pink);
-  color: var(--accent-pink);
+  color: var(--text-primary);
 }
 .delete-btn:hover:not(:disabled) {
-  background: var(--accent-pink);
+  background: var(--text-secondary);
 }
 
 .edit-title-group {

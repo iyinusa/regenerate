@@ -123,45 +123,78 @@
 
 .evolution-timeline {
   position: relative;
-  padding-left: 2rem;
+  display: flex;
+  overflow-x: auto;
+  padding: 6rem 1rem 3rem;
+  gap: 3rem;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
-.evolution-timeline::before {
+.evolution-timeline::-webkit-scrollbar {
+  display: none;
+}
+
+/* .evolution-timeline::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, #113493, #7b2ff7, #ff2e97);
-}
+  right: 0;
+  top: 5rem;
+  height: 2px;
+  background: linear-gradient(90deg, #113493, #7b2ff7, #ff2e97);
+  z-index: 1;
+} */
 
 .evolution-item {
   position: relative;
+  min-width: 320px;
   padding: 1.5rem;
-  margin-bottom: 2rem;
-  margin-left: 1rem;
+  margin-bottom: 0;
+  margin-left: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+  background: var(--glass);
+  border-radius: 15px;
+  border: 5px solid var(--glass-border);
+  transition: transform 1s ease;
+}
+
+.evolution-item:hover {
+  transform: rotateX(25deg) !important;
 }
 
 .evolution-item::before {
   content: '';
   position: absolute;
-  left: -3.3rem;
-  top: 2rem;
-  width: 12px;
-  height: 12px;
+  left: 50%;
+  top: -2.3rem; /* Positioned on the line at top:5rem */
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #113493;
   box-shadow: 0 0 15px rgba(31, 74, 174, 0.6);
+  transform: translateX(-50%);
+  z-index: 3;
 }
 
 .evolution-period {
+  position: absolute;
+  top: -4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.9rem;
-  color: #113493;
+  color: var(--text-secondary);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin-bottom: 0.5rem;
+  white-space: nowrap;
+}
+
+.evolution-content {
+  text-align: center;
 }
 
 .evolution-content h5 {
@@ -182,16 +215,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .acquired-tag {
   padding: 0.4rem 0.8rem;
   border-radius: 15px;
   font-size: 0.8rem;
-  background: rgba(0, 255, 136, 0.1);
-  color: #00ff88;
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  background: var(--accent-blue);
+  color: #fff;
+  border: var(--accent-blue);
   font-weight: 600;
 }
 
@@ -243,12 +276,13 @@
   }
 
   .evolution-timeline {
-    padding-left: 1.5rem;
+    padding-top: 5rem;
+    gap: 1.5rem;
   }
 
   .evolution-item {
-    padding: 2rem;
-    margin-left: 1.5rem;
+    min-width: 280px;
+    padding: 1.25rem;
   }
 }
 
@@ -347,7 +381,7 @@
 
 .skills-carousel-card:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  transform: translateZ(20px) !important;
+  /* transform: translateZ(20px) !important; */
   background: linear-gradient(
     135deg,
     rgba(31, 74, 174, 0.3) 0%,
@@ -387,12 +421,12 @@
   font-size: 1.1rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .skill-card-score {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
 }
 
 @keyframes spin {
@@ -403,4 +437,62 @@
 @keyframes spinRevert {
   from { transform: rotateY(360deg); }
   to { transform: rotateY(0deg); }
+}
+
+/* Vis-Timeline Custom Styles */
+.vis-timeline-custom {
+  border: none !important;
+  font-family: inherit;
+  color: white;
+}
+
+.vis-timeline {
+  border: none;
+}
+
+.vis-item {
+  border-color: #113493;
+  background-color: rgba(17, 52, 147, 0.3);
+  color: white;
+  border-radius: 5px;
+}
+
+.vis-item.vis-selected {
+  border-color: #ff2e97;
+  background-color: rgba(255, 46, 151, 0.4);
+  z-index: 2;
+}
+
+.vis-item-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px;
+}
+
+.vis-item-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.vis-item-date {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.vis-time-axis .vis-text {
+  color: rgba(255,255,255,0.7);
+}
+
+.vis-time-axis .vis-grid.vis-minor {
+  border-color: rgba(255,255,255,0.1);
+}
+
+.vis-time-axis .vis-grid.vis-major {
+  border-color: rgba(255,255,255,0.2);
+}
+
+.vis-labelset .vis-label {
+  color: white;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }

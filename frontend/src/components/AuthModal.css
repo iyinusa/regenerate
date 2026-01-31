@@ -62,7 +62,7 @@
 }
 
 .auth-modal-header h2 {
-  color: var(--text-primary);
+  color: var(--gradient-primary);
   font-size: 1.75rem;
   margin: 0;
   font-weight: 700;
@@ -290,7 +290,7 @@
 .link-button {
   background: none;
   border: none;
-  color: #00c6ff;
+  color: var(--accent-blue);
   font-weight: 600;
   cursor: pointer;
   padding: 0.25rem 0.5rem;

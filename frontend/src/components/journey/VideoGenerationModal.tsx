@@ -187,11 +187,11 @@ const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
 
           {/* Modal Footer */}
           <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>
+            <button className="secondary-btn" onClick={onClose}>
               Cancel
             </button>
             <motion.button
-              className="btn btn-primary btn-generate"
+              className="primary-btn btn-generate"
               onClick={handleGenerate}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

@@ -143,7 +143,7 @@ const ProfileTab: React.FC = () => {
             {/* Note: Backend supports email update but we might want to be careful. Leaving it enabled as per requirement 'edit profile details (Full Name, Email)' */}
           </div>
           <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={isProfileLoading}>
+            <button type="submit" className="primary-btn" disabled={isProfileLoading}>
               {isProfileLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -289,7 +289,7 @@ const ProfileTab: React.FC = () => {
             </button>
           </div>
           <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={isPasswordLoading}>
+            <button type="submit" className="primary-btn" disabled={isPasswordLoading}>
               {isPasswordLoading ? 'Updating...' : 'Change Password'}
             </button>
           </div>

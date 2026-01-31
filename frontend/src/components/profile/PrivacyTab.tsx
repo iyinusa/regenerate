@@ -231,7 +231,7 @@ const PrivacyTab: React.FC = () => {
 
             <div className="form-actions">
                 <button 
-                    className="btn-primary" 
+                    className="primary-btn" 
                     onClick={handleSave}
                     disabled={saving}
                 >

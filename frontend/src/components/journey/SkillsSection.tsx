@@ -518,15 +518,15 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ skills, journey, profile,
                   <div className="evolution-content">
                     <h5>{evolution.milestone || evolution.stage || evolution.skill || 'Skill Development'}</h5>
                     <p>{evolution.description || evolution.proficiency_growth || 'Skills development phase'}</p>
+                    {evolution.context && (
+                      <p className="evolution-context">{evolution.context}</p>
+                    )}
                     {(evolution.skills_acquired || (evolution.skill && [evolution.skill])) && (
                       <div className="acquired-skills">
                         {(evolution.skills_acquired || [evolution.skill]).map((skill: string, i: number) => (
                           <span key={i} className="acquired-tag">+{skill}</span>
                         ))}
                       </div>
-                    )}
-                    {evolution.context && (
-                      <p className="evolution-context">{evolution.context}</p>
                     )}
                   </div>
                 </motion.div>
