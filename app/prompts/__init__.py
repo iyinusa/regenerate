@@ -26,6 +26,13 @@ from app.prompts.task_prompts import (
     TASK_PLAN_SCHEMA,
 )
 
+from app.prompts.video_prompts import (
+    get_character_bible,
+    build_veo_segment_prompt,
+    validate_segment_for_veo,
+    get_veo_generation_guidelines,
+)
+
 # Import Pydantic-based schemas for Gemini structured output (recommended approach)
 from app.schemas.gemini_schemas import (
     # Pydantic Models
@@ -57,6 +64,11 @@ __all__ = [
     # Task Prompts
     "get_task_planning_prompt",
     "TASK_PLAN_SCHEMA",
+    # Video Prompts (Veo 3.1)
+    "get_character_bible",
+    "build_veo_segment_prompt",
+    "validate_segment_for_veo",
+    "get_veo_generation_guidelines",
     # Pydantic Models (Production-grade)
     "ProfileExtractionResult",
     "JourneyStructureResult",

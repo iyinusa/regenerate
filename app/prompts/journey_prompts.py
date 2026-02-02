@@ -326,11 +326,18 @@ def get_documentary_narrative_prompt(journey_data: Dict[str, Any], profile_data:
 **SEGMENT STRUCTURE:**
 Each segment needs:
 1. **Title** - Segment name
-2. **Duration** - 8 seconds
-3. **Visual Description** - What viewers see (for Veo 3.1 generation)
-4. **Narration** - Voiceover script (concise, impactful)
-5. **Mood** - Emotional tone of the segment
-6. **Data Visualization** - Any charts/graphs to show (optional)
+2. **Duration** - 8 seconds (fixed)
+3. **Visual Description** - What viewers see (REQUIRED for Veo 3.1 generation)
+4. **Narration** - Voiceover script (REQUIRED, 10-15 words max for 8-second segments)
+5. **Mood** - Emotional tone (inspirational, professional, dynamic, reflective, triumphant)
+6. **Background Music Hint** - Music style suggestion
+7. **Data Visualization** - Any charts/graphs to show (type and data_points)
+
+**CRITICAL VEO 3.1 REQUIREMENTS:**
+- Narration MUST be between 10-15 words for 8-second segments
+- Narration MUST be provided (segments without narration will be skipped)
+- Visual Description MUST be provided (segments without visuals will be skipped)
+- Mood helps determine voice quality (warm/uplifting, clear/authoritative, energetic, thoughtful, confident)
 
 **DOCUMENTARY FLOW:**
 1. Opening Hook - Grab attention immediately
@@ -343,13 +350,21 @@ Each segment needs:
 
 **VISUAL DESCRIPTIONS FOR VEO:**
 Be specific about:
-- Camera angles and movements
-- Color palettes and lighting
-- Data visualizations to render
-- Transitions between segments
+- Camera angles and movements (e.g., "Medium close-up tracking shot", "Wide establishing shot")
+- Color palettes and lighting (e.g., "Cool blue professional lighting", "Warm amber tones")
+- Subject positioning and framing (e.g., "Professional in modern office, centered frame")
+- Data visualizations to render (e.g., "Rising bar chart showing growth metrics")
+- Transitions between segments (e.g., "Fade to black", "Cross-dissolve to next scene")
 
-**EXAMPLE NARRATION STYLE:**
-"In 2015, [Name] took their first step into the world of software engineering. What started as curiosity would soon become a career defined by innovation and impact..."
+**NARRATION GUIDELINES:**
+- Keep it concise: 10-15 words maximum per 8-second segment
+- Make every word count - avoid filler
+- Use strong, active voice
+- Create emotional connection
+- Build narrative momentum
+
+**EXAMPLE NARRATION (22 words):**
+"In 2015, Kennedy took his first step into software engineering. What started as curiosity became a career defined by innovation and impact."
 
 Return a JSON object with the complete documentary structure."""
 

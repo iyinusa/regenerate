@@ -25,11 +25,11 @@ const ImmersiveAudio: React.FC<ImmersiveAudioProps> = ({ profile }) => {
     if (!profile) return;
 
     const text = [
-      profile.name,
-      profile.title,
-      profile.bio,
+      profile.name || '',
+      profile.title || '',
+      profile.bio || '',
       ...(profile.skills || []),
-      ...(profile.experiences?.map((e: any) => (e.title || '') + ' ' + (e.description || '')) || [])
+      ...(profile.experiences?.filter((e: any) => e).map((e: any) => (e.title || '') + ' ' + (e.description || '')) || [])
     ].join(' ').toLowerCase();
 
     let foundIndustry = 'others';

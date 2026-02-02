@@ -111,15 +111,17 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
           </motion.div>
 
           {/* Experience Details */}
-          <motion.div
-            className="experience-details"
-            key={selectedIndex}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <ExperienceCard experience={experiences[selectedIndex]} />
-          </motion.div>
+          {experiences[selectedIndex] && (
+            <motion.div
+              className="experience-details"
+              key={selectedIndex}
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <ExperienceCard experience={experiences[selectedIndex]} />
+            </motion.div>
+          )}
         </div>
 
         {/* Career Chapters */}
@@ -236,6 +238,8 @@ const ExperienceCard: React.FC<{ experience: any }> = ({ experience }) => {
       ? '0 20px 60px rgba(31, 74, 174, 0.2)'
       : '0 8px 32px rgba(31, 74, 174, 0.1)',
   });
+
+  if (!experience) return null;
 
   return (
     <animated.div

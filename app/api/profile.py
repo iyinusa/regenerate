@@ -16,7 +16,8 @@ from app.schemas.profile import (
     ProfileStatus,
     TaskInfo,
     ProfileHistoryResponse,
-    ProfileHistoryUpdate
+    ProfileHistoryUpdate,
+    VideoGenerateRequest
 )
 from app.services.profile_service import profile_service
 from app.services.task_orchestrator import task_orchestrator
@@ -83,6 +84,60 @@ async def generate_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start profile generation: {str(e)}"
+        )
+
+
+@router.post(
+    "/{history_id}/generate-video",
+    response_model=ProfileGenerateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Start Video Generation",
+    description="Initiate the video generation process for a profile history."
+)
+async def generate_video(
+    history_id: str,
+    request: VideoGenerateRequest,
+    db: AsyncSession = Depends(get_db)
+) -> ProfileGenerateResponse:
+    """Generate video documentary for a profile history.
+    
+    Args:
+        history_id: ID of the profile history
+        request: Video generation settings
+        db: Database session
+        
+    Returns:
+        Response with job ID and initial status
+    """
+    try:
+        # Check if history exists
+        history = await db.get(ProfileHistory, history_id)
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+            
+        logger.info(f"Starting video generation for history: {history_id}")
+        
+        job_id = await profile_service.start_video_generation(
+            history_id=history_id,
+            settings=request.dict()
+        )
+        
+        return ProfileGenerateResponse(
+            job_id=job_id,
+            status=ProfileStatus.PROCESSING,
+            message="Video generation started. Connect to WebSocket for updates."
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start video generation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start video generation: {str(e)}"
         )
 
 

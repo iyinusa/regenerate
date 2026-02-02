@@ -98,7 +98,15 @@ elif immersive_path_dev.exists():
     app.mount("/immersive", StaticFiles(directory=str(immersive_path_dev)), name="immersive")
     logger.info(f"Mounted development immersive audio files from {immersive_path_dev}")
 else:
-    logger.warning("No immersive audio files found")
+    logger.warning("Immersive audio directory not found")
+
+# Mount generated videos
+videos_path = Path("app/static/videos")
+videos_path.mkdir(parents=True, exist_ok=True)
+app.mount("/videos", StaticFiles(directory=str(videos_path)), name="videos")
+
+# Mount frontend static # This part is tricky if SPA routing is needed, usually handled by catching all else
+logger.warning("No immersive audio files found")
 
 # Try to mount the built React app first (production)
 if frontend_dist.exists() and (frontend_dist / "index.html").exists():

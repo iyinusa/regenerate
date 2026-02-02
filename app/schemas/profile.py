@@ -58,6 +58,22 @@ class ProfileGenerateRequest(BaseModel):
         }
 
 
+class VideoGenerateRequest(BaseModel):
+    """Request schema for video generation."""
+    export_format: str = Field(default="720p", description="Video resolution: 720p, 1080p, 4k")
+    aspect_ratio: str = Field(default="16:9", description="Video aspect ratio: 16:9, 9:16")
+    first_segment_only: bool = Field(default=False, description="Generate only first segment for preview")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "export_format": "1080p",
+                "aspect_ratio": "16:9",
+                "first_segment_only": False
+            }
+        }
+
+
 class ProfileGenerateResponse(BaseModel):
     """Response schema for profile generation initiation."""
     job_id: str = Field(..., description="Unique job identifier for tracking")

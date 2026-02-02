@@ -330,11 +330,57 @@
   color: var(--text-secondary);
 }
 
+/* Narration Info Container */
+.narration-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  gap: 1rem;
+}
+
 .char-count {
-  text-align: right;
   font-size: 0.75rem;
   color: var(--text-secondary);
-  margin-top: 0.5rem;
+}
+
+.word-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 500;
+}
+
+.word-count-optimal {
+  color: #00CC66;
+}
+
+.word-count-exceeded {
+  color: #FF6B6B;
+  font-weight: 600;
+}
+
+.warning-icon {
+  font-size: 0.875rem;
+  color: #FFD700;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.success-icon {
+  font-size: 0.875rem;
+  color: #00CC66;
+  font-weight: bold;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Advanced Settings */

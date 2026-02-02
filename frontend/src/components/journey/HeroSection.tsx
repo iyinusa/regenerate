@@ -93,21 +93,43 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     }
   };
 
-  const handleGenerate = (settings: VideoSettings) => {
+  const handleGenerate = async (settings: VideoSettings) => {
     console.log('Generating video with settings:', settings);
     console.log('Documentary data:', editedDocumentary);
     
     // Close the generation modal
     setShowGenerationModal(false);
     
-    // TODO: Call backend API to generate video
-    // For now, call the appropriate callback based on video availability
-    const hasFullVideo = !!documentary?.full_video;
+    if (!historyId) {
+      console.error('No history ID available for video generation');
+      return;
+    }
     
-    if (hasFullVideo && onRegenerateVideo) {
-      onRegenerateVideo();
-    } else if (onGenerateVideo) {
-      onGenerateVideo();
+    try {
+      // Import API client
+      const { apiClient } = await import('@/lib/api.ts');
+      
+      const hasFullVideo = !!documentary?.full_video;
+      
+      const result = await apiClient.generateVideo(historyId, {
+        export_format: settings.exportFormat,
+        aspect_ratio: settings.aspectRatio,
+        first_segment_only: settings.firstSegmentOnly || false
+      });
+      
+      if (result.job_id) {
+        console.log('Video generation started:', result);
+        
+        // Call the appropriate callback based on video availability
+        if (hasFullVideo && onRegenerateVideo) {
+          onRegenerateVideo();
+        } else if (onGenerateVideo) {
+          onGenerateVideo();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to start video generation:', error);
+      // You could show an error notification here
     }
   };
   

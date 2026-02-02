@@ -168,6 +168,51 @@ class ProfileExtractionService:
         logger.info(f"Started profile extraction job {job_id} for URL: {url} (Guest: {guest_user_id})")
         return job_id
     
+    async def start_video_generation(
+        self,
+        history_id: str,
+        settings: Dict[str, Any] = None
+    ) -> str:
+        """Start a video generation job for a specific profile history.
+        
+        Args:
+            history_id: The profile history ID
+            settings: Video generation settings
+            
+        Returns:
+            job_id for the new job
+        """
+        job_id = f"job_video_{uuid.uuid4().hex[:8]}"
+        
+        # Create plan for video generation only
+        plan = task_orchestrator.create_plan(
+            job_id=job_id,
+            source_url="internal", # Not used for video gen
+            options={
+                "history_id": history_id,
+                "generate_video_only": True,
+                "video_settings": settings or {}
+            }
+        )
+        
+        # Store job
+        profile_jobs[job_id] = {
+            "status": ProfileStatus.PROCESSING,
+            "progress": 0,
+            "message": "Video generation started...",
+            "created_at": datetime.utcnow(),
+            "history_id": history_id,
+            "plan_id": plan.plan_id,
+            "use_orchestrator": True,
+            "tasks": [t.to_dict() for t in plan.tasks]
+        }
+        
+        # Start execution
+        asyncio.create_task(self._execute_with_orchestrator(job_id, history_id))
+        
+        logger.info(f"Started video generation job {job_id} for history {history_id}")
+        return job_id
+
     async def _execute_with_orchestrator(self, job_id: str, history_id: str) -> None:
         """Execute profile extraction using the task orchestrator.
         
@@ -257,14 +302,14 @@ class ProfileExtractionService:
                     intro_video = video_results.get("intro_video") or profile_data.get("intro_video")
                     full_video = video_results.get("full_video") or profile_data.get("full_video")
                     
-                    # Save comprehensive data to database with all task results
+                    # Save comprehensive data to database with all task results and plan options
                     await self._save_comprehensive_data_to_database(
                         history_id, 
                         profile_data, 
                         journey_data, 
                         timeline_data, 
                         documentary_data,
-                        result_data  # Pass all task results for raw_data tracking
+                        {**result_data, **(plan.options or {})}  # Pass task results plus plan options
                     )
                     
                     profile_jobs[job_id].update({
@@ -289,7 +334,7 @@ class ProfileExtractionService:
                             journey_data,
                             timeline_data,
                             documentary_data,
-                            result_data  # Pass all task results even for failed cases
+                            {**result_data, **(plan.options or {})}  # Pass task results plus plan options
                         )
                     
                     profile_jobs[job_id].update({
@@ -402,43 +447,67 @@ class ProfileExtractionService:
         """
         try:
             from app.db.session import async_session_maker
+            from app.models.user import ProfileHistory
             if async_session_maker is not None:
                 async with async_session_maker() as db:
-                    # Combine all data into structured_data
-                    comprehensive_data = {
-                        **{k: v for k, v in profile_data.items() 
-                           if k not in ['raw_data', 'source_url', 'extraction_timestamp']},
-                        "journey": journey_data if journey_data else {"status": "not_generated"},
-                        "timeline": timeline_data if timeline_data else {"status": "not_generated"},
-                        "documentary": documentary_data if documentary_data else {"status": "not_generated"},
-                        "generated_at": datetime.utcnow().isoformat()
-                    }
+                    # Get existing record first if we need to preserve data
+                    existing_history = await db.get(ProfileHistory, history_id)
                     
-                    # Add generation status metadata
-                    comprehensive_data["generation_status"] = {
-                        "journey_generated": bool(journey_data and not journey_data.get('error')),
-                        "timeline_generated": bool(timeline_data and not timeline_data.get('error')),
-                        "documentary_generated": bool(documentary_data and not documentary_data.get('error')),
-                        "has_warnings": any(
-                            data.get('warning') for data in [journey_data, timeline_data, documentary_data] 
-                            if isinstance(data, dict)
-                        )
-                    }
+                    # Check if this is a video-only generation (don't overwrite structured_data)
+                    is_video_only = all_task_results and all_task_results.get("generate_video_only") == True
                     
-                    # Build comprehensive raw_data with all steps
-                    raw_data_comprehensive = {
-                        "profile_extraction": profile_data.get("raw_data", {}),
-                        "all_task_results": all_task_results or {},
-                        "processing_steps": {
-                            "fetch_profile": all_task_results.get("fetch_profile", {}) if all_task_results else {},
-                            "enrich_profile": all_task_results.get("enrich_profile", {}) if all_task_results else {},
-                            "aggregate_history": all_task_results.get("aggregate_history", {}) if all_task_results else {},
-                            "structure_journey": all_task_results.get("structure_journey", {}) if all_task_results else {},
-                            "generate_timeline": all_task_results.get("generate_timeline", {}) if all_task_results else {},
-                            "generate_documentary": all_task_results.get("generate_documentary", {}) if all_task_results else {}
-                        },
-                        "captured_at": datetime.utcnow().isoformat()
-                    }
+                    if is_video_only:
+                        # For video-only generation, preserve existing structured_data and only update video fields
+                        logger.info(f"Video-only generation detected for history_id: {history_id}, preserving existing structured_data")
+                        
+                        if existing_history and existing_history.structured_data:
+                            comprehensive_data = existing_history.structured_data
+                            logger.info(f"Preserved existing structured_data with keys: {list(comprehensive_data.keys())}")
+                        else:
+                            logger.warning(f"No existing structured_data found for history_id: {history_id}")
+                            comprehensive_data = {}
+                    else:
+                        # Full profile generation - combine all data into structured_data
+                        comprehensive_data = {
+                            **{k: v for k, v in profile_data.items() 
+                               if k not in ['raw_data', 'source_url', 'extraction_timestamp']},
+                            "journey": journey_data if journey_data else {"status": "not_generated"},
+                            "timeline": timeline_data if timeline_data else {"status": "not_generated"},
+                            "documentary": documentary_data if documentary_data else {"status": "not_generated"},
+                            "generated_at": datetime.utcnow().isoformat()
+                        }
+                    
+                    # Add generation status metadata only for full profile generation
+                    if not is_video_only:
+                        comprehensive_data["generation_status"] = {
+                            "journey_generated": bool(journey_data and not journey_data.get('error')),
+                            "timeline_generated": bool(timeline_data and not timeline_data.get('error')),
+                            "documentary_generated": bool(documentary_data and not documentary_data.get('error')),
+                            "has_warnings": any(
+                                data.get('warning') for data in [journey_data, timeline_data, documentary_data] 
+                                if isinstance(data, dict)
+                            )
+                        }
+                    
+                    # Build comprehensive raw_data with all steps (only for full profile generation)
+                    if not is_video_only:
+                        raw_data_comprehensive = {
+                            "profile_extraction": profile_data.get("raw_data", {}),
+                            "all_task_results": all_task_results or {},
+                            "processing_steps": {
+                                "fetch_profile": all_task_results.get("fetch_profile", {}) if all_task_results else {},
+                                "enrich_profile": all_task_results.get("enrich_profile", {}) if all_task_results else {},
+                                "aggregate_history": all_task_results.get("aggregate_history", {}) if all_task_results else {},
+                                "structure_journey": all_task_results.get("structure_journey", {}) if all_task_results else {},
+                                "generate_timeline": all_task_results.get("generate_timeline", {}) if all_task_results else {},
+                                "generate_documentary": all_task_results.get("generate_documentary", {}) if all_task_results else {}
+                            },
+                            "captured_at": datetime.utcnow().isoformat()
+                        }
+                    else:
+                        # For video-only generation, preserve existing raw_data
+                        raw_data_comprehensive = existing_history.raw_data if existing_history else {}
+                        logger.info(f"Preserved existing raw_data for video-only generation")
                     
                     # Extract video URLs from task results or profile data
                     video_results = all_task_results.get("generate_video", {}) if all_task_results else {}

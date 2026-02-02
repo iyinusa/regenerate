@@ -37,14 +37,17 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
   loading = false
 }) => {
   const MAX_SEGMENTS = 16;
+  const MAX_NARRATION_WORDS = 15; // Veo 3.1 requirement for 8-second segments
   const [segments, setSegments] = useState<DocumentarySegment[]>([]);
   const [expandedSegments, setExpandedSegments] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (documentary?.segments) {
       // Initialize with existing segments or create a default one
-      const initialSegments = documentary.segments.length > 0 
-        ? documentary.segments 
+      // Filter out any potential null/undefined segments to prevent crashes
+      const validSegments = documentary.segments.filter(s => s);
+      const initialSegments = validSegments.length > 0 
+        ? validSegments 
         : [{
             id: '1',
             order: 1,
@@ -64,6 +67,11 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
     const updatedSegments = [...segments];
     updatedSegments[index] = { ...updatedSegments[index], narration: value };
     setSegments(updatedSegments);
+  };
+
+  const getWordCount = (text: string): number => {
+    if (!text || text.trim() === '') return 0;
+    return text.trim().split(/\s+/).length;
   };
 
   const handleAdvancedChange = (index: number, field: keyof DocumentarySegment, value: any) => {
@@ -236,11 +244,22 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
                     className="narration-textarea"
                     value={segment.narration || ''}
                     onChange={(e) => handleNarrationChange(index, e.target.value)}
-                    placeholder="Enter voiceover narration for this segment..."
+                    placeholder="Enter voiceover narration for this segment (10-15 words recommended)..."
                     rows={4}
                   />
-                  <div className="char-count">
-                    {(segment.narration || '').length} characters
+                  <div className="narration-info">
+                    <div className="char-count">
+                      {(segment.narration || '').length} characters
+                    </div>
+                    <div className={`word-count ${getWordCount(segment.narration || '') > MAX_NARRATION_WORDS ? 'word-count-exceeded' : getWordCount(segment.narration || '') >= 10 ? 'word-count-optimal' : ''}`}>
+                      {getWordCount(segment.narration || '')} / {MAX_NARRATION_WORDS} words
+                      {getWordCount(segment.narration || '') > MAX_NARRATION_WORDS && (
+                        <span className="warning-icon" title="Exceeds Veo limit">⚠️</span>
+                      )}
+                      {getWordCount(segment.narration || '') >= 10 && getWordCount(segment.narration || '') <= MAX_NARRATION_WORDS && (
+                        <span className="success-icon" title="Optimal for Veo">✓</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

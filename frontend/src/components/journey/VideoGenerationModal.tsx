@@ -15,6 +15,7 @@ interface VideoGenerationModalProps {
 export interface VideoSettings {
   exportFormat: '720p' | '1080p' | '4k';
   aspectRatio: '9:16' | '16:9';
+  firstSegmentOnly?: boolean;
 }
 
 const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
@@ -25,9 +26,10 @@ const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
 }) => {
   const [exportFormat, setExportFormat] = useState<'720p' | '1080p' | '4k'>('720p');
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('16:9');
+  const [firstSegmentOnly, setFirstSegmentOnly] = useState(false);
 
   const handleGenerate = () => {
-    onGenerate({ exportFormat, aspectRatio });
+    onGenerate({ exportFormat, aspectRatio, firstSegmentOnly });
   };
 
   const getResolutionDetails = (format: string) => {
@@ -171,6 +173,63 @@ const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                     <span>Portrait (TikTok, Instagram)</span>
                   </div>
                   {aspectRatio === '9:16' && (
+                    <motion.div
+                      className="checkmark"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring" }}
+                    >
+                      ✓
+                    </motion.div>
+                  )}
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Generation Options */}
+            <div className="setting-group">
+              <h4 className="setting-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+                Generation Mode
+              </h4>
+              <div className="generation-options">
+                <motion.button
+                  className={`generation-option ${!firstSegmentOnly ? 'active' : ''}`}
+                  onClick={() => setFirstSegmentOnly(false)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="option-icon">🎬</div>
+                  <div className="option-details">
+                    <strong>Full Documentary</strong>
+                    <span>Generate all segments (longer processing)</span>
+                  </div>
+                  {!firstSegmentOnly && (
+                    <motion.div
+                      className="checkmark"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring" }}
+                    >
+                      ✓
+                    </motion.div>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  className={`generation-option ${firstSegmentOnly ? 'active' : ''}`}
+                  onClick={() => setFirstSegmentOnly(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="option-icon">⚡</div>
+                  <div className="option-details">
+                    <strong>First Segment Preview</strong>
+                    <span>Quick generation for preview (8 seconds)</span>
+                  </div>
+                  {firstSegmentOnly && (
                     <motion.div
                       className="checkmark"
                       initial={{ scale: 0 }}
