@@ -21,6 +21,8 @@ services:
       - ./alembic.ini:/app/alembic.ini
       # Mount logs directory for persistence
       - ./logs:/app/logs
+      # Mount GCS credentials (read-only)
+      - ./secure:/app/secure:ro
       # Mount .env file (read-only)
       - ./.env:/app/.env:ro
       # Mount frontend directory for development (writable for npm install & build)

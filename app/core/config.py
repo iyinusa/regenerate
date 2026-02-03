@@ -111,6 +111,20 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="Redis connection URL"
     )
+    
+    # Google Cloud Storage settings
+    gcs_bucket_name: str = Field(
+        default="regen_videos",
+        description="Google Cloud Storage bucket name for videos"
+    )
+    gcp_project_id: str = Field(
+        default="",
+        description="Google Cloud Platform project ID"
+    )
+    google_application_credentials: str = Field(
+        default="",
+        description="Path to GCP service account JSON credentials file"
+    )
 
     @property
     def is_development(self) -> bool:

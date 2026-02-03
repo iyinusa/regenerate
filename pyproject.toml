@@ -45,6 +45,7 @@ dependencies = [
     "authlib>=1.2.1",
     "itsdangerous>=2.1.2",
     "moviepy>=1.0.3",
+    "google-cloud-storage>=2.10.0",
 ]
 
 [project.optional-dependencies]

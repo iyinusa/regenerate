@@ -380,52 +380,14 @@ const Journey: React.FC = () => {
           // canEdit={canEdit}
           onDocumentaryUpdate={setDocumentary}
           onGenerateVideo={() => {
-            handleEdit('generate video', async () => {
-              if (!historyId) {
-                console.error('No history ID available for video generation');
-                return;
-              }
-              
-              try {
-                console.log('Generating documentary video...');
-                const result = await apiClient.generateVideo(historyId, {
-                  export_format: '1080p',
-                  aspect_ratio: '16:9',
-                  first_segment_only: true
-                });
-                
-                if (result.job_id) {
-                  console.log('Video generation started:', result);
-                  // You could show a toast notification here or update UI
-                  // The WebSocket connection should handle progress updates
-                }
-              } catch (error) {
-                console.error('Failed to start video generation:', error);
-              }
-            });
+            // Note: The actual API call is made in HeroSection.handleGenerate()
+            // This callback is for any post-generation UI updates
+            console.log('Video generation callback triggered');
           }}
           onRegenerateVideo={() => {
-            handleEdit('regenerate video', async () => {
-              if (!historyId) {
-                console.error('No history ID available for video regeneration');
-                return;
-              }
-              
-              try {
-                console.log('Regenerating documentary video...');
-                const result = await apiClient.generateVideo(historyId, {
-                  export_format: '720p',
-                  aspect_ratio: '16:9',
-                  first_segment_only: false
-                });
-                
-                if (result.job_id) {
-                  console.log('Video regeneration started:', result);
-                }
-              } catch (error) {
-                console.error('Failed to start video regeneration:', error);
-              }
-            });
+            // Note: The actual API call is made in HeroSection.handleGenerate()
+            // This callback is for any post-regeneration UI updates
+            console.log('Video regeneration callback triggered');
           }}
           onRequestEdit={handleEdit}
         />

@@ -1,7 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './DocumentaryPlayer.css';
 import VideoGenerationModal, { VideoSettings } from './VideoGenerationModal';
+import DocumentaryEditModal from './DocumentaryEditModal';
+import AuthModal from '../AuthModal';
+import { useAuth } from '@/hooks/useAuth';
+import { apiClient } from '@/lib/api.ts';
 
 interface DocumentaryPlayerProps {
   documentary: {
@@ -14,7 +18,21 @@ interface DocumentaryPlayerProps {
   canEdit?: boolean;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
-  onEditDocumentary?: () => void;
+  historyId?: string; // Add historyId prop for video generation
+}
+
+interface VideoGenerationStatus {
+  jobId: string;
+  status: 'processing' | 'completed' | 'failed';
+  progress: number;
+  message: string;
+  error?: string;
+}
+
+interface ErrorMessage {
+  id: string;
+  message: string;
+  timestamp: number;
 }
 
 const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
@@ -22,8 +40,9 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   canEdit = true,
   onGenerateVideo,
   onRegenerateVideo,
-  onEditDocumentary
+  historyId
 }) => {
+  const { isAuthenticated } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -32,9 +51,19 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [editedDocumentary, setEditedDocumentary] = useState(documentary);
+  
+  // Video generation status tracking
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<VideoGenerationStatus | null>(null);
+  const [errorMessages, setErrorMessages] = useState<ErrorMessage[]>([]);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const firstFrameLoadedRef = useRef(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const errorTimeoutRefs = useRef<Map<string, number>>(new Map());
 
   // Update edited documentary when documentary prop changes
   useEffect(() => {
@@ -48,6 +77,146 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Add error message with auto-dismiss
+  const addErrorMessage = useCallback((message: string) => {
+    const id = `error_${Date.now()}`;
+    const newError: ErrorMessage = {
+      id,
+      message,
+      timestamp: Date.now()
+    };
+    
+    setErrorMessages(prev => [...prev, newError]);
+    
+    // Auto-dismiss after 10 seconds
+    const timeoutId = setTimeout(() => {
+      removeErrorMessage(id);
+    }, 10000) as unknown as number;
+    
+    errorTimeoutRefs.current.set(id, timeoutId);
+  }, []);
+
+  // Remove error message
+  const removeErrorMessage = useCallback((id: string) => {
+    setErrorMessages(prev => prev.filter(error => error.id !== id));
+    
+    // Clear timeout if exists
+    const timeoutId = errorTimeoutRefs.current.get(id);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      errorTimeoutRefs.current.delete(id);
+    }
+  }, []);
+
+  // Connect to WebSocket for video generation updates
+  const connectVideoGenerationWebSocket = useCallback((jobId: string) => {
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    try {
+      const ws = new WebSocket(apiClient.getWebSocketUrl(jobId));
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('Video generation WebSocket connected');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleVideoGenerationUpdate(data);
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('Video generation WebSocket disconnected');
+      };
+
+      ws.onerror = (error) => {
+        console.error('Video generation WebSocket error:', error);
+        addErrorMessage('Connection error during video generation');
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      addErrorMessage('Failed to establish real-time connection');
+    }
+  }, [addErrorMessage]);
+
+  // Handle video generation status updates
+  const handleVideoGenerationUpdate = useCallback((data: any) => {
+    console.log('Video generation update:', data);
+
+    if (data.event === 'task_started' || data.event === 'task_progress') {
+      if (data.task?.task_type === 'generate_video') {
+        setGenerationStatus({
+          jobId: data.job_id,
+          status: 'processing',
+          progress: data.task.progress || 0,
+          message: data.task.message || 'Generating video...'
+        });
+      }
+    } else if (data.event === 'task_completed') {
+      if (data.task?.task_type === 'generate_video') {
+        setGenerationStatus({
+          jobId: data.job_id,
+          status: 'completed',
+          progress: 100,
+          message: 'Video generation completed!'
+        });
+        
+        // Stop generating state after a short delay
+        setTimeout(() => {
+          setIsGenerating(false);
+          setGenerationStatus(null);
+          
+          // Call the appropriate callback based on whether this was a regeneration
+          if (isFullVideo && onRegenerateVideo) {
+            onRegenerateVideo();
+          } else if (onGenerateVideo) {
+            onGenerateVideo();
+          }
+        }, 2000);
+      }
+    } else if (data.event === 'task_failed') {
+      if (data.task?.task_type === 'generate_video') {
+        const errorMsg = data.task?.error || 'Video generation failed';
+        setGenerationStatus({
+          jobId: data.job_id,
+          status: 'failed',
+          progress: 0,
+          message: 'Generation failed',
+          error: errorMsg
+        });
+        
+        addErrorMessage(errorMsg);
+        
+        // Stop generating state
+        setTimeout(() => {
+          setIsGenerating(false);
+          setGenerationStatus(null);
+        }, 3000);
+      }
+    }
+  }, [addErrorMessage, onGenerateVideo]);
+
+  // Cleanup WebSocket and timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      
+      // Clear all error timeouts
+      errorTimeoutRefs.current.forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+      errorTimeoutRefs.current.clear();
+    };
+  }, []);
 
   // Determine which video to use (priority: full_video > intro_url)
   const videoUrl = documentary?.full_video || documentary?.intro_url;
@@ -185,25 +354,74 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   };
 
   const handleGenerateAction = () => {
-    // Open the edit modal at parent level to allow users to configure the documentary
-    if (onEditDocumentary) {
-      onEditDocumentary();
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
     }
+    // Open the edit modal first to allow modifications
+    setShowEditModal(true);
   };
 
-  const handleGenerate = (settings: VideoSettings) => {
+  const handleEditSave = (updatedDoc: any) => {
+    console.log('Documentary updated:', updatedDoc);
+    setEditedDocumentary(updatedDoc);
+    setShowEditModal(false);
+    // After saving, open the generation settings modal
+    setShowGenerationModal(true);
+  };
+
+  const handleGenerate = async (settings: VideoSettings) => {
+    if (!historyId) {
+      addErrorMessage('No history ID available for video generation');
+      return;
+    }
+
     console.log('Generating video with settings:', settings);
     console.log('Documentary data:', editedDocumentary);
     
     // Close the generation modal
     setShowGenerationModal(false);
     
-    // TODO: Call backend API to generate video
-    // For now, call the appropriate callback
-    if (isFullVideo && onRegenerateVideo) {
-      onRegenerateVideo();
-    } else if (onGenerateVideo) {
-      onGenerateVideo();
+    try {
+      // Start generating state
+      setIsGenerating(true);
+      setGenerationStatus({
+        jobId: 'starting',
+        status: 'processing',
+        progress: 0,
+        message: 'Starting video generation...'
+      });
+
+      // Call backend API to generate video
+      const result = await apiClient.generateVideo(historyId, {
+        export_format: settings.exportFormat,
+        aspect_ratio: settings.aspectRatio,
+        first_segment_only: settings.firstSegmentOnly || false
+      });
+      
+      if (result.job_id) {
+        console.log('Video generation started:', result);
+        
+        // Connect to WebSocket for real-time updates
+        connectVideoGenerationWebSocket(result.job_id);
+        
+        setGenerationStatus({
+          jobId: result.job_id,
+          status: 'processing',
+          progress: 5,
+          message: result.message || 'Video generation in progress...'
+        });
+      } else {
+        throw new Error('Failed to get job ID from video generation request');
+      }
+    } catch (error) {
+      console.error('Failed to start video generation:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to start video generation';
+      addErrorMessage(errorMsg);
+      
+      // Reset generating state
+      setIsGenerating(false);
+      setGenerationStatus(null);
     }
   };
 
@@ -227,6 +445,19 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
 
   return (
     <>
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="login"
+      />
+
+      <DocumentaryEditModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        documentary={editedDocumentary}
+        onSave={handleEditSave}
+      />
+
       {/* Generation Settings Modal */}
       <VideoGenerationModal
         isOpen={showGenerationModal}
@@ -253,6 +484,103 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
             >
               Your browser does not support the video tag.
             </video>
+
+            {/* Video Generation Blur Overlay */}
+            <AnimatePresence>
+              {isGenerating && (
+                <motion.div
+                  className="video-generation-overlay"
+                  initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  animate={{ opacity: 1, backdropFilter: 'blur(10px)' }}
+                  exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="generation-status">
+                    <motion.div
+                      className="generation-icon"
+                      animate={{ 
+                        rotate: [0, 360],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "linear"
+                      }}
+                    >
+                      🎬
+                    </motion.div>
+                    
+                    <div className="generation-info">
+                      <h3 className="generation-title">Generating Your Documentary</h3>
+                      <p className="generation-message">
+                        {generationStatus?.message || 'Creating cinematic experience...'}
+                      </p>
+                      
+                      {/* Progress Bar */}
+                      <div className="generation-progress">
+                        <div className="progress-track">
+                          <motion.div
+                            className="progress-fill"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${generationStatus?.progress || 0}%` }}
+                            transition={{ duration: 0.5, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <span className="progress-text">
+                          {generationStatus?.progress || 0}%
+                        </span>
+                      </div>
+                      
+                      {/* Animated Dots */}
+                      <div className="generation-dots">
+                        {[...Array(3)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="dot"
+                            animate={{
+                              scale: [1, 1.5, 1],
+                              opacity: [0.3, 1, 0.3]
+                            }}
+                            transition={{
+                              duration: 1.5,
+                              repeat: Infinity,
+                              delay: i * 0.2
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Error Messages */}
+            <AnimatePresence>
+              {errorMessages.map((error) => (
+                <motion.div
+                  key={error.id}
+                  className="video-error-message"
+                  initial={{ opacity: 0, y: -30, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -30, scale: 0.9 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  <div className="error-content">
+                    <span className="error-icon">⚠️</span>
+                    <span className="error-text">{error.message}</span>
+                    <button
+                      className="error-close-btn"
+                      onClick={() => removeErrorMessage(error.id)}
+                      aria-label="Close error message"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
             {/* Loading State */}
             {isLoading && (
@@ -361,6 +689,103 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
         ) : (
           // Empty state when no video is available
           <div className="empty-player">
+            {/* Video Generation Blur Overlay for empty state */}
+            <AnimatePresence>
+              {isGenerating && (
+                <motion.div
+                  className="video-generation-overlay"
+                  initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  animate={{ opacity: 1, backdropFilter: 'blur(10px)' }}
+                  exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="generation-status">
+                    <motion.div
+                      className="generation-icon"
+                      animate={{ 
+                        rotate: [0, 360],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "linear"
+                      }}
+                    >
+                      🎬
+                    </motion.div>
+                    
+                    <div className="generation-info">
+                      <h3 className="generation-title">Generating Your Documentary</h3>
+                      <p className="generation-message">
+                        {generationStatus?.message || 'Creating cinematic experience...'}
+                      </p>
+                      
+                      {/* Progress Bar */}
+                      <div className="generation-progress">
+                        <div className="progress-track">
+                          <motion.div
+                            className="progress-fill"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${generationStatus?.progress || 0}%` }}
+                            transition={{ duration: 0.5, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <span className="progress-text">
+                          {generationStatus?.progress || 0}%
+                        </span>
+                      </div>
+                      
+                      {/* Animated Dots */}
+                      <div className="generation-dots">
+                        {[...Array(3)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="dot"
+                            animate={{
+                              scale: [1, 1.5, 1],
+                              opacity: [0.3, 1, 0.3]
+                            }}
+                            transition={{
+                              duration: 1.5,
+                              repeat: Infinity,
+                              delay: i * 0.2
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Error Messages for empty state */}
+            <AnimatePresence>
+              {errorMessages.map((error) => (
+                <motion.div
+                  key={error.id}
+                  className="video-error-message"
+                  initial={{ opacity: 0, y: -30, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -30, scale: 0.9 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  <div className="error-content">
+                    <span className="error-icon">⚠️</span>
+                    <span className="error-text">{error.message}</span>
+                    <button
+                      className="error-close-btn"
+                      onClick={() => removeErrorMessage(error.id)}
+                      aria-label="Close error message"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
             <div className="empty-content">
               <motion.div
                 className="empty-icon"
@@ -383,7 +808,7 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
               {canEdit && (
                 <motion.button
                   className="generate-video-btn"
-                  onClick={onGenerateVideo}
+                  onClick={() => setShowGenerationModal(true)}
                   whileHover={{ 
                     scale: 1.05,
                     boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"

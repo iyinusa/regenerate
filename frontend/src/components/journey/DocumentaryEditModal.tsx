@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './DocumentaryEditModal.css';
 
@@ -141,17 +142,25 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="modal-backdrop" onClick={onClose}>
-        <motion.div
-          className="documentary-edit-modal"
-          onClick={(e) => e.stopPropagation()}
-          initial={{ opacity: 0, scale: 0.9, y: 50 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 50 }}
-          transition={{ type: "spring", duration: 0.5 }}
+      {isOpen && (
+        <motion.div 
+          className="documentary-edit-backdrop" 
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
         >
+          <motion.div
+            className="documentary-edit-modal glass-morphism"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.9, y: 50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 50 }}
+            transition={{ type: "spring", duration: 0.5 }}
+          >
           {/* Modal Header */}
           <div className="modal-header">
             <div className="header-content">
@@ -416,8 +425,10 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
             </button>
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+      </motion.div>
+    )}
+    </AnimatePresence>,
+    document.body
   );
 };
 

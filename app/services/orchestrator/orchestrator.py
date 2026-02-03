@@ -32,6 +32,8 @@ class TaskOrchestrator:
     # Class-level storage for active plans
     _active_plans: Dict[str, TaskPlan] = {}
     _update_callbacks: Dict[str, Set[Callable]] = {}
+    # Track plans that are currently executing to prevent duplicate execution
+    _executing_plans: Set[str] = set()
     
     def __init__(self):
         """Initialize the task orchestrator."""
@@ -196,11 +198,26 @@ class TaskOrchestrator:
         """Execute the task plan for a job.
         
         Runs tasks in order, respecting dependencies, and broadcasts progress updates.
+        Guards against duplicate execution of the same plan.
         """
+        # Guard against duplicate execution
+        if job_id in self._executing_plans:
+            logger.warning(f"Plan {job_id} is already executing, skipping duplicate execution request")
+            return
+        
         plan = self._active_plans.get(job_id)
         if not plan:
             logger.error(f"No plan found for job {job_id}")
             return
+        
+        # Check if plan has already been executed
+        if plan.status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+            logger.warning(f"Plan {job_id} has already been executed (status: {plan.status}), skipping")
+            return
+        
+        # Mark plan as executing
+        self._executing_plans.add(job_id)
+        logger.info(f"Starting execution of plan {job_id}")
         
         plan.status = TaskStatus.RUNNING
         await self._broadcast_update(job_id, "plan_started", plan.to_dict())
@@ -245,6 +262,10 @@ class TaskOrchestrator:
                 "error": str(e),
                 "plan": plan.to_dict()
             })
+        finally:
+            # Always remove from executing set when done
+            self._executing_plans.discard(job_id)
+            logger.info(f"Finished execution of plan {job_id} (status: {plan.status})")
     
     async def _execute_task(self, job_id: str, plan: TaskPlan, task: Task) -> None:
         """Execute a single task."""
@@ -289,14 +310,20 @@ class TaskOrchestrator:
             if task.retry_count < task.max_retries:
                 task.retry_count += 1
                 task.message = f"Retrying ({task.retry_count}/{task.max_retries})..."
-                await self._broadcast_update(job_id, "task_retrying", task.to_dict())
+                await self._broadcast_update(job_id, "task_retrying", {
+                    "task": task.to_dict(),
+                    "plan_progress": plan.progress
+                })
                 await asyncio.sleep(2 ** task.retry_count)  # Exponential backoff
                 await self._execute_task(job_id, plan, task)
             else:
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
                 task.message = f"Failed: {str(e)}"
-                await self._broadcast_update(job_id, "task_failed", task.to_dict())
+                await self._broadcast_update(job_id, "task_failed", {
+                    "task": task.to_dict(),
+                    "plan_progress": plan.progress
+                })
     
     def _dependencies_satisfied(self, plan: TaskPlan, task: Task) -> bool:
         """Check if all dependencies for a task are satisfied."""

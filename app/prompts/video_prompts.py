@@ -4,6 +4,7 @@ This module contains all prompts and utilities related to Veo 3.1 video generati
 optimized for voiceover detection and visual continuity.
 """
 
+import json
 from typing import Dict, Any
 
 
@@ -107,37 +108,65 @@ def build_veo_segment_prompt(
         if viz_type and data_points:
             data_hint = f"(Data: {', '.join(str(dp) for dp in data_points[:5])}). "
     
-    # Build audio description with mood-based tone cues
-    audio_parts = []
-    
-    # Add voice quality based on mood
+    # Determine voice style and pace from mood
+    voice_style = "professional, clear"
+    pace = "steady"
     if mood:
         mood_lower = mood.lower()
         if mood_lower == "inspirational":
-            audio_parts.append("Warm, uplifting voice")
+            voice_style = "warm, uplifting"
+            pace = "measured"
         elif mood_lower == "professional":
-            audio_parts.append("Clear, authoritative voice")
+            voice_style = "clear, authoritative"
+            pace = "steady"
         elif mood_lower == "dynamic":
-            audio_parts.append("Energetic, engaging voice")
+            voice_style = "energetic, engaging"
+            pace = "brisk"
         elif mood_lower == "reflective":
-            audio_parts.append("Thoughtful, contemplative voice")
+            voice_style = "thoughtful, contemplative"
+            pace = "slow"
         elif mood_lower == "triumphant":
-            audio_parts.append("Confident, celebratory voice")
-        else:
-            audio_parts.append("Professional voice")
+            voice_style = "confident, celebratory"
+            pace = "measured"
     
-    # Add background music if available
-    if background_music:
-        audio_parts.append(background_music)
+    # Build visual description with data hint
+    full_visual_description = visual_description
+    if data_hint:
+        full_visual_description = f"{visual_description} {data_hint}"
     
-    audio_description = "; ".join(audio_parts) if audio_parts else "Professional background music"
+    # Determine motion complexity based on mood
+    motion_complexity = "medium"
+    if mood:
+        mood_lower = mood.lower()
+        if mood_lower in ["reflective", "professional"]:
+            motion_complexity = "low"
+        elif mood_lower in ["dynamic", "triumphant"]:
+            motion_complexity = "high"
     
-    # Build the segment prompt
-    segment_prompt = (
-        f"A {mood} cinematic video. Narration is the primary element and begins immediately at 0 seconds, spoken clearly and fully before the clip ends: \"{narration}\" "
-        f"Visuals support the narration: {visual_description} {data_hint}"
-        f"Lighting is cool-toned and professional. Audio: {audio_description}."
-    )
+    # Build JSON-style segment prompt for Veo 3.1
+    segment_data = {
+        "id": segment.get("id", "segment_1"),
+        "duration_seconds": segment.get("duration_seconds", 8),
+        "priority": "narration",
+        "narration": {
+            "text": narration,
+            "start_time_seconds": 0,
+            "must_finish": True,
+            "voice_style": voice_style,
+            "pace": pace
+        },
+        "visuals": {
+            "description": full_visual_description.strip(),
+            "motion_complexity": motion_complexity
+        },
+        "audio": {
+            "background_music": background_music if background_music else None
+        },
+        "lighting": "cool-toned, professional"
+    }
+    
+    # Convert to JSON string with proper formatting
+    segment_prompt = json.dumps(segment_data, indent=2)
     
     # Include character bible if provided and requested
     if include_character_bible and character_bible:

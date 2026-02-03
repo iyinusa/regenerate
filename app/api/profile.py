@@ -1,8 +1,9 @@
 """Profile API routes."""
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
+import time
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
@@ -23,6 +24,7 @@ from app.services.profile_service import profile_service
 from app.services.task_orchestrator import task_orchestrator
 from app.db.session import get_db
 from app.core.dependencies import get_current_user_required
+from app.core.config import settings
 from app.models.user import User, ProfileHistory
 
 # Configure logging
@@ -30,6 +32,11 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/profile", tags=["profile"])
+
+# Track active video generation requests to prevent duplicates
+# Format: {history_id: (job_id, timestamp)}
+_active_video_generations: Dict[str, tuple] = {}
+VIDEO_GENERATION_COOLDOWN = 30  # seconds before allowing another request for same history
 
 
 @router.post(
@@ -92,44 +99,134 @@ async def generate_profile(
     response_model=ProfileGenerateResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Start Video Generation",
-    description="Initiate the video generation process for a profile history."
+    description="Initiate the video generation process for a profile history in the background."
 )
 async def generate_video(
     history_id: str,
     request: VideoGenerateRequest,
-    db: AsyncSession = Depends(get_db)
-) -> ProfileGenerateResponse:
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_required)
+) -> Dict[str, Any]:
     """Generate video documentary for a profile history.
+    
+    This endpoint starts a background video generation task that continues
+    even if the user disconnects. The task will:
+    
+    1. Generate video segments (first only or all based on generate_full)
+    2. Upload each segment to GCS as it's generated
+    3. Update database after each segment
+    4. Merge all segments into final video (if generate_full=True)
+    5. Clean up segment videos (keeping first segment as intro)
     
     Args:
         history_id: ID of the profile history
-        request: Video generation settings
+        request: Video generation settings (generate_full flag)
         db: Database session
+        current_user: Authenticated user
         
     Returns:
-        Response with job ID and initial status
+        Response with task ID for tracking progress
     """
     try:
-        # Check if history exists
+        # Check if history exists and belongs to user
         history = await db.get(ProfileHistory, history_id)
         if not history:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Profile history not found: {history_id}"
             )
+        
+        # Verify ownership
+        if current_user and history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to generate video for this profile"
+            )
+        
+        # Check if documentary data exists
+        if not history.structured_data or not history.structured_data.get("documentary"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No documentary data found. Generate profile first."
+            )
+        
+        documentary = history.structured_data.get("documentary", {})
+        segments = documentary.get("segments", [])
+        
+        if not segments:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No video segments found in documentary data"
+            )
+        
+        # Check for duplicate/rapid requests for the same history_id
+        current_time = time.time()
+        if history_id in _active_video_generations:
+            existing_job_id, request_time = _active_video_generations[history_id]
+            elapsed = current_time - request_time
             
+            # Check if the existing job is still running
+            existing_plan = task_orchestrator.get_plan(existing_job_id)
+            if existing_plan and existing_plan.status.value in ['pending', 'running']:
+                logger.warning(
+                    f"Duplicate video generation request for history {history_id} "
+                    f"(existing job: {existing_job_id}, elapsed: {elapsed:.1f}s)"
+                )
+                # Return the existing job info instead of creating a new one
+                return {
+                    "job_id": existing_job_id,
+                    "status": "already_processing",
+                    "message": "Video generation already in progress",
+                    "total_segments": 1 if request.first_segment_only else len(segments),
+                    "estimate_minutes": 1 if request.first_segment_only else len(segments)
+                }
+            
+            # If within cooldown period but job completed/failed, allow new request
+            if elapsed < VIDEO_GENERATION_COOLDOWN:
+                logger.warning(
+                    f"Video generation request within cooldown for history {history_id} "
+                    f"(elapsed: {elapsed:.1f}s, cooldown: {VIDEO_GENERATION_COOLDOWN}s)"
+                )
+        
         logger.info(f"Starting video generation for history: {history_id}")
+        logger.info(f"First segment only: {request.first_segment_only}, Total segments: {len(segments)}")
         
-        job_id = await profile_service.start_video_generation(
-            history_id=history_id,
-            settings=request.dict()
-        )
+        # Create task orchestrator plan for video generation
+        import uuid
+        job_id = f"video_{uuid.uuid4().hex[:8]}"
         
-        return ProfileGenerateResponse(
+        # Use task orchestrator for video generation (runs async in background)
+        plan = task_orchestrator.create_plan(
             job_id=job_id,
-            status=ProfileStatus.PROCESSING,
-            message="Video generation started. Connect to WebSocket for updates."
+            source_url=f"history:{history_id}",
+            options={
+                "generate_video_only": True,
+                "history_id": history_id,
+                "user_id": history.user_id,
+                "video_settings": {
+                    "first_segment_only": request.first_segment_only,
+                    "resolution": request.export_format,
+                    "aspect_ratio": request.aspect_ratio
+                }
+            }
         )
+        
+        # Execute plan in background (non-blocking)
+        import asyncio
+        asyncio.create_task(task_orchestrator.execute_plan(job_id))
+        
+        # Track this video generation request
+        _active_video_generations[history_id] = (job_id, time.time())
+        
+        segment_count = 1 if request.first_segment_only else len(segments)
+        
+        return {
+            "job_id": job_id,
+            "status": "processing",
+            "message": "Video generation started",
+            "total_segments": segment_count,
+            "estimate_minutes": segment_count  # ~1 min per segment
+        }
         
     except HTTPException:
         raise
@@ -232,6 +329,57 @@ async def get_task_details(job_id: str) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get task details: {str(e)}"
+        )
+
+
+@router.get(
+    "/video-status/{job_id}",
+    summary="Get Video Generation Status",
+    description="Check the status of a video generation job."
+)
+async def get_video_status(job_id: str) -> Dict[str, Any]:
+    """Get video generation task status.
+    
+    Returns current progress, segment URLs, and final video URL when complete.
+    
+    Args:
+        job_id: Video generation job ID from generate-video endpoint
+        
+    Returns:
+        Task status with progress and video URLs
+    """
+    try:
+        # Get status from task orchestrator
+        plan = task_orchestrator.get_plan(job_id)
+        
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Video generation job not found"
+            )
+        
+        # Get video result data from the plan
+        video_result = plan.result_data.get("generate_video", {})
+        
+        return {
+            "job_id": job_id,
+            "status": plan.status.value,
+            "progress": plan.progress,
+            "message": plan.tasks[0].message if plan.tasks else "Processing...",
+            "full_video_url": video_result.get("full_video_url"),
+            "intro_video_url": video_result.get("intro_video_url"),
+            "segment_urls": video_result.get("segment_urls", []),
+            "segments_generated": video_result.get("segments_generated", 0),
+            "generated_first_only": video_result.get("generated_first_only", True)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get video status for task {job_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get video status: {str(e)}"
         )
 
 
