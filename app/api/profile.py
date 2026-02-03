@@ -1710,7 +1710,9 @@ async def update_documentary(
         structured_data['updated_at'] = datetime.utcnow().isoformat()
         
         # Save to database
+        from sqlalchemy.orm.attributes import flag_modified
         history.structured_data = structured_data
+        flag_modified(history, 'structured_data')
         await db.commit()
         
         logger.info(f"Successfully updated documentary for history {history_id}")

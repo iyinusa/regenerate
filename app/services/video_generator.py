@@ -141,17 +141,6 @@ class VideoGenerator:
                 aspect_ratio=aspect_ratio
             )
             
-            # Handle video reference and optimize prompt for Veo
-            # original_prompt = prompt
-            if video_reference:
-                prompt = f"[Continue from previous scene] {prompt}"
-                logger.info(f"Added continuity prompt prefix")
-            
-            # Optimize prompt for Veo (max ~500 characters recommended)
-            # if len(prompt) > 500:
-            #     prompt = prompt[:497] + "..."
-            #     logger.info(f"Truncated prompt from {len(original_prompt)} to {len(prompt)} characters")
-            
             logger.info(f"Final prompt: {prompt}")
             
             # Call Gemini API to generate video
@@ -159,13 +148,22 @@ class VideoGenerator:
             logger.info(f"Prompt length: {len(prompt)} characters")
             logger.info(f"Config: duration={duration_seconds}s, resolution={resolution}, aspect_ratio={aspect_ratio}")
             
+            # Prepare arguments for generate_videos
+            kwargs = {
+                "model": model_name,
+                "prompt": prompt,
+                "config": config
+            }
+            
+            if video_reference:
+                logger.info("Passing previous video reference for continuity")
+                kwargs["video"] = video_reference
+
             # Make single API call - no retries to avoid rate limits
             logger.info("Calling Gemini Veo API...")
             operation = await asyncio.to_thread(
                 client.models.generate_videos,
-                model=model_name,
-                prompt=prompt,
-                config=config
+                **kwargs
             )
             logger.info("Video generation API call succeeded")
                 
@@ -250,8 +248,8 @@ class VideoGenerator:
                         logger.info(f"Video uploaded to GCS: {public_url}")
                         
                         # Optionally clean up local file after successful GCS upload
-                        # await asyncio.to_thread(filepath.unlink)
-                        # logger.info(f"Local temp file removed: {filepath}")
+                        await asyncio.to_thread(filepath.unlink)
+                        logger.info(f"Local temp file removed: {filepath}")
                         
                         return public_url, video_file
                         

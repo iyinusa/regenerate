@@ -125,6 +125,27 @@ class GenerateVideoHandler(BaseTaskHandler):
                 # Create progress callback
                 async def report_progress(status_msg: str):
                     task.message = f"Segment {valid_segments}: {status_msg}"
+                    
+                    # Calculate granular progress updates
+                    base_progress = 10
+                    completion_target = 85 # Target before merging
+                    total_progress_range = completion_target - base_progress
+                    segment_share = total_progress_range / max(1, len(segments))
+                    completed_segments_progress = (valid_segments - 1) * segment_share
+                    
+                    current_segment_progress = 0
+                    if "elapsed" in status_msg:
+                        try:
+                            import re
+                            match = re.search(r'(\d+)s elapsed', status_msg)
+                            if match:
+                                seconds = int(match.group(1))
+                                # Assume 60s max per segment for progress bar
+                                current_segment_progress = min(seconds / 60.0 * segment_share, segment_share * 0.95)
+                        except:
+                            pass
+                    
+                    task.progress = int(base_progress + completed_segments_progress + current_segment_progress)
                     await self.update_progress(job_id, task)
 
                 # Generate segment with user_id for GCS storage
@@ -210,9 +231,12 @@ class GenerateVideoHandler(BaseTaskHandler):
 
         # Save final video and intro video
         if current_history_id:
-            if intro_video_url:
-                await self._save_intro_video_to_db(current_history_id, intro_video_url)
+            # Always save intro video if we have any segments
+            if generated_segments:
+                first_seg_url = generated_segments[0]["url"]
+                await self._save_intro_video_to_db(current_history_id, first_seg_url)
                 logger.info(f"Saved intro video to database (history: {current_history_id})")
+
             if final_video_url:
                 await self._save_final_video_to_db(current_history_id, final_video_url)
                 logger.info(f"Saved full video to database (history: {current_history_id})")
@@ -304,12 +328,17 @@ class GenerateVideoHandler(BaseTaskHandler):
                 current_history = await db.get(ProfileHistory, history_id)
                 if current_history:
                     # Reset segment_videos on first segment (new generation)
+                    videos = list(current_history.segment_videos) if current_history.segment_videos else []
+                    
                     if segment_num == 1:
-                        current_history.segment_videos = [segment_url]
+                        videos = [segment_url]
                     else:
-                        if current_history.segment_videos is None:
-                            current_history.segment_videos = []
-                        current_history.segment_videos.append(segment_url)
+                        videos.append(segment_url)
+                    
+                    current_history.segment_videos = videos
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(current_history, 'segment_videos')
+                    
                     await db.commit()
                     logger.info(f"Saved segment {segment_num} URL to database")
                 break

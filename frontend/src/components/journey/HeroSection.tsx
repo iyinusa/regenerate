@@ -228,6 +228,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
               }}
               historyId={historyId}
               // canEdit={canEdit}
+              onRequestAuth={onRequestEdit}
               onGenerateVideo={() => {
                 if (onGenerateVideo) {
                     onGenerateVideo();

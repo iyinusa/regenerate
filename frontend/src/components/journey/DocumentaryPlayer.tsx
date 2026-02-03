@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import './DocumentaryPlayer.css';
 import VideoGenerationModal, { VideoSettings } from './VideoGenerationModal';
 import DocumentaryEditModal from './DocumentaryEditModal';
-import AuthModal from '../AuthModal';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api.ts';
 
@@ -19,6 +18,7 @@ interface DocumentaryPlayerProps {
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
   historyId?: string; // Add historyId prop for video generation
+  onRequestAuth?: (action: string, callback: () => void) => void;
 }
 
 interface VideoGenerationStatus {
@@ -40,7 +40,8 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   canEdit = true,
   onGenerateVideo,
   onRegenerateVideo,
-  historyId
+  historyId,
+  onRequestAuth
 }) => {
   const { isAuthenticated } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
@@ -52,7 +53,6 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [editedDocumentary, setEditedDocumentary] = useState(documentary);
   
   // Video generation status tracking
@@ -355,7 +355,11 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
 
   const handleGenerateAction = () => {
     if (!isAuthenticated) {
-      setShowAuthModal(true);
+      if (onRequestAuth) {
+        onRequestAuth('generate video', () => {
+             setShowEditModal(true);
+        });
+      }
       return;
     }
     // Open the edit modal first to allow modifications
@@ -445,12 +449,6 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
 
   return (
     <>
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        initialMode="login"
-      />
-
       <DocumentaryEditModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
