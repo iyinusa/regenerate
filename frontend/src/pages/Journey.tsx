@@ -149,7 +149,12 @@ const Journey: React.FC = () => {
           response = await apiClient.getJourneyByGuestId(guestId, historyIdParam);
           
           // Data structure from guest_id endpoint is different
-          setProfile(response.profile || null);
+          const profileData = response.profile || null;
+          // Inject passport from structured_data if available
+          if (profileData && response.passport) {
+            profileData._structured_data_passport = response.passport;
+          }
+          setProfile(profileData);
           setJourney(response.journey || null);
           setTimeline(response.timeline || null);
           setDocumentary(response.documentary || null);
@@ -377,7 +382,7 @@ const Journey: React.FC = () => {
           fullVideo={fullVideo}
           sectionIndex={0}
           historyId={historyId || undefined}
-          // canEdit={canEdit}
+          canEdit={canEdit}
           onDocumentaryUpdate={setDocumentary}
           onGenerateVideo={() => {
             // Note: The actual API call is made in HeroSection.handleGenerate()

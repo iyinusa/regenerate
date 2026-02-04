@@ -1,0 +1,215 @@
+/* Passport Edit Modal - Compact Design */
+.passport-modal-content {
+  background: var(--primary-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 100px rgba(123, 47, 247, 0.2),
+    inset 0 1px 1px var(--glass-border);
+  max-width: 480px;
+  width: 90%;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.passport-modal-content .close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.passport-modal-content .close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg);
+}
+
+.passport-modal-content .modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #7b2ff7 0%, var(--accent-blue) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Tabs */
+.passport-modal-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+}
+
+.passport-tab-button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.passport-tab-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.passport-tab-button.active {
+  background: linear-gradient(135deg, rgba(123, 47, 247, 0.2), rgba(31, 74, 174, 0.2));
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Preview */
+.passport-preview-container {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+/* Form */
+.passport-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.passport-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.passport-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.passport-file-input,
+.passport-text-input {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.passport-file-input:focus,
+.passport-text-input:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.passport-text-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.passport-help-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.passport-error-message {
+  padding: 0.75rem;
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 8px;
+  color: #ff3b30;
+  font-size: 0.9rem;
+}
+
+/* Actions */
+.passport-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+.passport-cancel-button,
+.passport-save-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.passport-cancel-button {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+}
+
+.passport-cancel-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.passport-save-button {
+  background: linear-gradient(135deg, #7b2ff7, var(--accent-blue));
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.passport-save-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 20px rgba(123, 47, 247, 0.4);
+}
+
+.passport-save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .passport-modal-content {
+    max-width: 100%;
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .passport-modal-actions {
+    flex-direction: column;
+  }
+  
+  .passport-cancel-button,
+  .passport-save-button {
+    width: 100%;
+  }
+}

@@ -88,6 +88,7 @@ class ProfileExtractionResult(BaseModel):
     used with response_json_schema in Gemini API calls.
     """
     name: str = Field(..., description="Full name of the person")
+    passport: Optional[str] = Field(default=None, description="Passport photo or profile image URL")
     title: Optional[str] = Field(default=None, description="Current job title or professional role")
     location: Optional[str] = Field(default=None, description="Geographic location")
     bio: Optional[str] = Field(default=None, description="Professional bio or summary")

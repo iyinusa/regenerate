@@ -186,6 +186,12 @@
   border-radius: 2px;
 }
 
+/* Timer Display */
+.time-display {
+  font-size: 0.7rem;
+  color: #fff;
+}
+
 /* Control Bar */
 .control-bar {
   position: absolute;

@@ -13,6 +13,7 @@ PROFILE_EXTRACTION_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "properties": {
         "name": {"type": "string", "description": "Full name of the person"},
+        "passport": {"type": "string", "description": "Passport photo or profile image URL"},
         "title": {"type": "string", "description": "Current job title or professional role"},
         "location": {"type": "string", "description": "Geographic location"},
         "bio": {"type": "string", "description": "Professional bio or summary"},
@@ -125,7 +126,7 @@ PROFILE_EXTRACTION_SCHEMA: Dict[str, Any] = {
             "description": "Related links discovered about the person (articles, mentions, portfolio pages, etc.)"
         }
     },
-    "required": ["name"]
+    "required": ["name", "title",  "bio", "education", "experiences", "skills"]
 }
 
 
@@ -177,6 +178,7 @@ The provided URL is just the starting point. You MUST use Google Search (and URL
 **Phase 1: Basic Profile Data & Link Discovery**
 Extract the standard profile fields:
 - name: Full name
+- passport: URL to profile image or passport photo
 - title: Current professional title or role
 - location: Geographic location
 - bio: Professional summary

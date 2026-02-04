@@ -47,18 +47,68 @@ class GCSStorageService:
             logger.error(f"Failed to initialize GCS client: {e}")
             raise
 
-    def _get_blob_path(self, user_id: str, filename: str) -> str:
+    def _get_image_blob_path(self, user_id: str, filename: str) -> str:
         """
-        Generate the GCS blob path for a video file.
+        Generate the GCS blob path for an image file.
 
         Args:
             user_id: User or guest ID
-            filename: Name of the video file
+            filename: Name of the image file
 
         Returns:
-            Full blob path in format: videos/{user_id}/{filename}
+            Full blob path in format: images/{user_id}/{filename}
         """
-        return f"videos/{user_id}/{filename}"
+        return f"images/{user_id}/{filename}"
+
+    async def upload_file_object(
+        self,
+        file_obj,
+        user_id: str,
+        filename: str,
+        content_type: str,
+        folder: str = "images",
+        make_public: bool = True
+    ) -> str:
+        """
+        Upload a file object (like UploadFile) to GCS.
+
+        Args:
+            file_obj: File-like object
+            user_id: User or guest ID
+            filename: Name of the file
+            content_type: MIME type
+            folder: folder name in bucket default 'images'
+            make_public: Whether to make the file public
+
+        Returns:
+            Public URL
+        """
+        try:
+            blob_path = f"{folder}/{user_id}/{filename}"
+            blob = self.bucket.blob(blob_path)
+            
+            # Reset file pointer if needed
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+                
+            # Run blocking upload in thread pool
+            await asyncio.to_thread(
+                blob.upload_from_file,
+                file_obj,
+                content_type=content_type
+            )
+            
+            if make_public:
+                try:
+                    await asyncio.to_thread(blob.make_public)
+                except Exception as e:
+                    logger.warning(f"Could not make blob public (bucket might have uniform access control): {e}")
+            
+            return blob.public_url
+
+        except Exception as e:
+            logger.error(f"Failed to upload file object to GCS: {e}")
+            raise GoogleCloudError(f"Upload failed: {str(e)}")
 
     async def upload_video(
         self,

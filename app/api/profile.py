@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 import time
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, File, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,8 +20,10 @@ from app.schemas.profile import (
     ProfileHistoryUpdate,
     VideoGenerateRequest
 )
+import time
 from app.services.profile_service import profile_service
 from app.services.task_orchestrator import task_orchestrator
+from app.services.storage_service import gcs_storage
 from app.db.session import get_db
 from app.core.dependencies import get_current_user_required
 from app.core.config import settings
@@ -39,6 +41,80 @@ _active_video_generations: Dict[str, tuple] = {}
 VIDEO_GENERATION_COOLDOWN = 30  # seconds before allowing another request for same history
 
 
+@router.post(
+    "/passport/upload",
+    response_model=Dict[str, str],
+    summary="Upload Passport Image",
+    description="Upload a passport image to GCS and return the public URL."
+)
+async def upload_passport(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user_required)
+):
+    """
+    Upload a passport image to GCS and return the public URL.
+    """
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Generate unique filename
+    extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"passport_{int(time.time())}.{extension}"
+    
+    try:
+        url = await gcs_storage.upload_file_object(
+            file.file,
+            str(current_user.id),
+            filename,
+            file.content_type,
+            folder="passports"
+        )
+        return {"url": url}
+    except Exception as e:
+        logger.error(f"Failed to upload passport: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put(
+    "/passport/{history_id}",
+    response_model=Dict[str, Any],
+    summary="Update Passport URL",
+    description="Update the passport URL in the profile history structured data."
+)
+async def update_passport(
+    history_id: str,
+    data: Dict[str, str],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    """Update profile passport URL."""
+    # Check if history exists and belongs to user
+    history = await db.get(ProfileHistory, history_id)
+    if not history:
+        raise HTTPException(status_code=404, detail="Profile history not found")
+        
+    if history.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    if "passport" not in data:
+        raise HTTPException(status_code=400, detail="Passport URL required")
+        
+    # Update structured data - save passport at ROOT level (not under profile)
+    structured_data = history.structured_data if history.structured_data else {}
+    # Make a copy to avoid mutation issues
+    structured_data = dict(structured_data)
+    structured_data["passport"] = data["passport"]
+    
+    # Log for debugging
+    logger.info(f"Updating passport for history {history_id}: {data['passport']}")
+    logger.info(f"Structured data keys after update: {list(structured_data.keys())}")
+    
+    history.structured_data = structured_data
+    await db.commit()
+    await db.refresh(history)
+    
+    logger.info(f"Passport saved successfully. Returning: {structured_data.get('passport')}")
+    return {"passport": structured_data["passport"]}
 @router.post(
     "/generate",
     response_model=ProfileGenerateResponse,
@@ -550,6 +626,7 @@ async def get_journey_by_guest_id(
         return {
             "guest_id": guest_id,
             "profile": profile_content,
+            "passport": structured_data.get("passport"),
             "journey": structured_data.get("journey", {}),
             "timeline": structured_data.get("timeline", {}),
             "documentary": structured_data.get("documentary", {}),

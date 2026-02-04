@@ -1,10 +1,14 @@
-import { motion, useScroll, useTransform } from 'framer-motion';
+import React from 'react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import './HeroSection.css';
 import DocumentaryPlayer from './DocumentaryPlayer';
 import DocumentaryEditModal from './DocumentaryEditModal';
+import PassportEditModal from './PassportEditModal';
 import VideoGenerationModal, { VideoSettings } from './VideoGenerationModal';
 import { apiClient } from '@/lib/api';
+
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
 interface HeroSectionProps {
   profile: any;
@@ -16,6 +20,7 @@ interface HeroSectionProps {
   historyId?: string;
   canEdit?: boolean;
   onDocumentaryUpdate?: (updatedDocumentary: any) => void;
+  onProfileUpdate?: (updatedProfile: any) => void;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
   onRequestEdit?: (action: string, callback: () => void) => void;
@@ -29,17 +34,66 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   fullVideo,
   sectionIndex,
   historyId,
-  // canEdit = true,
+  canEdit = true,
   onDocumentaryUpdate,
+  onProfileUpdate,
   onGenerateVideo,
   onRegenerateVideo,
   onRequestEdit
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPassportModal, setShowPassportModal] = useState(false);
+  const [showPassportView, setShowPassportView] = useState(false);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editedDocumentary, setEditedDocumentary] = useState(documentary);
+  const [isHoveringPassport, setIsHoveringPassport] = useState(false);
+
+  // Local state for passport from structured_data
+  const [localPassport, setLocalPassport] = useState<string | null>(null);
+
+  // Extract passport from structured_data on mount or when profile changes
+  React.useEffect(() => {
+    // Passport is stored in structured_data at root level, not in profile
+    const passportUrl = (profile as any)?._structured_data_passport || profile?.passport;
+    setLocalPassport(passportUrl || null);
+  }, [profile]);
+
+  const handlePassportUpdate = async (url: string) => {
+    if (!historyId) return;
+    
+    // Optimistic update
+    setLocalPassport(url);
+
+    try {
+      await apiClient.updateProfilePassport(historyId, url);
+      // Notify parent if callback provided
+      if (onProfileUpdate) {
+        // Update profile with new passport reference
+        const updatedProfile = { ...profile, _structured_data_passport: url };
+        onProfileUpdate(updatedProfile);
+      }
+    } catch (err) {
+      console.error("Failed to update passport:", err);
+      // Revert on error
+      const passportUrl = (profile as any)?._structured_data_passport || profile?.passport;
+      setLocalPassport(passportUrl || null);
+      setError("Failed to update passport photo");
+    }
+  };
+  
+  const handlePassportClick = () => {
+    if (canEdit) {
+      if (onRequestEdit) {
+          onRequestEdit('update_passport', () => setShowPassportModal(true));
+      } else {
+          setShowPassportModal(true); 
+      }
+    } else {
+      setShowPassportView(true);
+    }
+  };
 
   const handleSaveDocumentary = async (updatedDocumentary: any) => {
     if (!historyId) {
@@ -140,12 +194,50 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <div className="hero-name gradient-text">
-              {profile?.name || 'Professional Journey'}
+            <div className="hero-identity-row">
+              <div 
+                className="hero-passport" 
+                onClick={handlePassportClick}
+                onMouseEnter={() => canEdit && setIsHoveringPassport(true)}
+                onMouseLeave={() => setIsHoveringPassport(false)}
+                style={{ cursor: 'pointer' }}
+              >
+                <img 
+                  src={localPassport || DEFAULT_AVATAR} 
+                  alt={profile?.name || "Profile"} 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                  }}
+                />
+                
+                {/* Edit Overlay */}
+                {canEdit && (
+                  <AnimatePresence>
+                    {isHoveringPassport && (
+                      <motion.div 
+                        className="passport-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                           <path d="M12 20h9"></path>
+                           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                         </svg>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
+              </div>
+              <div className="hero-text-content">
+                <div className="hero-name gradient-text">
+                  {profile?.name || 'Professional Journey'}
+                </div>
+                <p className="hero-title">
+                  {journey?.summary?.headline || profile?.title || 'Innovator | Creator | Leader'}
+                </p>
+              </div>
             </div>
-            <p className="hero-title">
-              {journey?.summary?.headline || profile?.title || 'Innovator | Creator | Leader'}
-            </p>
           </motion.div>
 
           <motion.div 
@@ -181,7 +273,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 full_video: fullVideo
               }}
               historyId={historyId}
-              // canEdit={canEdit}
+              canEdit={canEdit}
               onRequestAuth={onRequestEdit}
               onGenerateVideo={() => {
                 if (onGenerateVideo) {
@@ -239,6 +331,36 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           documentary={editedDocumentary}
           onGenerate={handleGenerate}
         />
+
+        {/* Passport Edit Modal */}
+        <PassportEditModal
+          isOpen={showPassportModal}
+          onClose={() => setShowPassportModal(false)}
+          currentPassport={localPassport}
+          onSave={handlePassportUpdate}
+        />
+
+        {/* Passport View Modal (Animated Popup) */}
+        <AnimatePresence>
+          {showPassportView && (
+            <div className="modal-overlay" onClick={() => setShowPassportView(false)}>
+              <motion.div 
+                className="passport-view-content glass"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                  <motion.img 
+                    src={localPassport || DEFAULT_AVATAR}
+                    alt="Passport View"
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                    layoutId="passport-image" 
+                  />
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Scroll Indicator */}
         <motion.div 

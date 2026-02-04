@@ -689,15 +689,17 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
                         >
                           ⛶
                         </button>
-                        <motion.button
-                          className="generate-btn"
-                          onClick={handleGenerateAction}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <span className="btn-icon">🎬</span>
-                          {isFullVideo ? 'Regenerate Documentary' : 'Generate Full Documentary'}
-                        </motion.button>
+                        {historyId && canEdit && (
+                          <motion.button
+                            className="generate-btn"
+                            onClick={handleGenerateAction}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <span className="btn-icon">🎬</span>
+                            {isFullVideo ? 'Regenerate Documentary' : 'Generate Full Documentary'}
+                          </motion.button>
+                        )}
                       </div>
                     </div>
                   </div>
