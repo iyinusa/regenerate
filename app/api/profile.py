@@ -1682,6 +1682,9 @@ async def update_documentary(
         HTTPException: If history not found or update fails
     """
     try:
+        logger.info(f"Updating documentary for history_id: {history_id}")
+        logger.debug(f"Documentary data received: {documentary}")
+        
         # Get the profile history record
         from app.models.user import ProfileHistory
         from sqlalchemy import select
@@ -1714,6 +1717,7 @@ async def update_documentary(
         history.structured_data = structured_data
         flag_modified(history, 'structured_data')
         await db.commit()
+        await db.refresh(history)
         
         logger.info(f"Successfully updated documentary for history {history_id}")
         

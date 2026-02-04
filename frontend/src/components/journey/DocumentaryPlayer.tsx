@@ -366,12 +366,33 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
     setShowEditModal(true);
   };
 
-  const handleEditSave = (updatedDoc: any) => {
+  const handleEditSave = async (updatedDoc: any) => {
     console.log('Documentary updated:', updatedDoc);
-    setEditedDocumentary(updatedDoc);
-    setShowEditModal(false);
-    // After saving, open the generation settings modal
-    setShowGenerationModal(true);
+    
+    if (!historyId) {
+      addErrorMessage('No history ID available for saving documentary');
+      return;
+    }
+
+    try {
+      // Save documentary to database
+      console.log('Saving documentary to database...', updatedDoc);
+      const endpoint = `/api/v1/profile/documentary/${historyId}`;
+      const result = await apiClient.put(endpoint, updatedDoc);
+      
+      console.log('Documentary saved successfully:', result);
+      
+      // Update local state
+      setEditedDocumentary(updatedDoc);
+      setShowEditModal(false);
+      
+      // After saving, open the generation settings modal
+      setShowGenerationModal(true);
+    } catch (error) {
+      console.error('Failed to save documentary:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to save documentary';
+      addErrorMessage(errorMsg);
+    }
   };
 
   const handleGenerate = async (settings: VideoSettings) => {

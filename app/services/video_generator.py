@@ -87,7 +87,7 @@ class VideoGenerator:
         prompt: str, 
         duration_seconds: int = 8,
         aspect_ratio: str = "16:9",
-        resolution: str = "1080p",
+        resolution: str = "720p",
         video_reference: Optional[Any] = None,
         user_id: Optional[str] = None,
         progress_callback: Optional[Callable[[str], Awaitable[None]]] = None
@@ -124,7 +124,7 @@ class VideoGenerator:
             valid_aspect_ratios = ["16:9", "9:16"]
             
             if resolution not in valid_resolutions:
-                resolution = "1080p"
+                resolution = "720p"
                 logger.warning(f"Invalid resolution, defaulting to {resolution}")
             
             if aspect_ratio not in valid_aspect_ratios:

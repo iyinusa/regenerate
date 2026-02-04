@@ -74,6 +74,8 @@ class GenerateVideoHandler(BaseTaskHandler):
             segments = segments[:1]
             logger.info("Generating first segment only as requested")
         else:
+            # force resolution to 720p for multiple segments due to Veo limits for extension videos
+            resolution = '720p'
             logger.info(f"Generating all {len(segments)} segments")
         
         # Get journey and profile data for character bible
@@ -208,26 +210,31 @@ class GenerateVideoHandler(BaseTaskHandler):
         final_video_url = None
         intro_video_url = generated_segments[0]["url"] if generated_segments else None
         
-        try:
-            if len(generated_segments) > 1:
-                # Merge all segments with GCS support
-                stitched_url = await video_generator.stitch_videos(
-                    video_filenames=segment_urls,
-                    user_id=user_id
-                )
-                if stitched_url.startswith("https://"):
-                    final_video_url = stitched_url
-                else:
-                    final_video_url = video_generator.get_url(stitched_url)
-            elif len(generated_segments) == 1:
-                # Don't set final_video_url for single segment (incomplete video)
-                # Only intro_video_url should be set for preview/first segment
-                logger.info("Single segment generated - saving as intro video only, not full video")
-        except Exception as e:
-            logger.error(f"Merging failed: {e}")
-            # Only set final_video_url if we have multiple segments (complete video)
-            if generated_segments and len(generated_segments) > 1:
-                final_video_url = generated_segments[0]["url"]
+        # Save final URLs
+        if len(generated_segments) > 1:
+            final_video_url = segment_url # Last generated extension segment URL from Veo
+            
+        # This merging is not required since Veo now combine full video for extensions
+        # try:
+        #     if len(generated_segments) > 1:
+        #         # Merge all segments with GCS support
+        #         stitched_url = await video_generator.stitch_videos(
+        #             video_filenames=segment_urls,
+        #             user_id=user_id
+        #         )
+        #         if stitched_url.startswith("https://"):
+        #             final_video_url = stitched_url
+        #         else:
+        #             final_video_url = video_generator.get_url(stitched_url)
+        #     elif len(generated_segments) == 1:
+        #         # Don't set final_video_url for single segment (incomplete video)
+        #         # Only intro_video_url should be set for preview/first segment
+        #         logger.info("Single segment generated - saving as intro video only, not full video")
+        # except Exception as e:
+        #     logger.error(f"Merging failed: {e}")
+        #     # Only set final_video_url if we have multiple segments (complete video)
+        #     if generated_segments and len(generated_segments) > 1:
+        #         final_video_url = generated_segments[0]["url"]
 
         # Save final video and intro video
         if current_history_id:

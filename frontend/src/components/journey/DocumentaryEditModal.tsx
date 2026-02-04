@@ -133,6 +133,8 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
       ...documentary,
       segments
     };
+    console.log('DocumentaryEditModal - Saving documentary:', updatedDocumentary);
+    console.log('DocumentaryEditModal - Segments count:', segments.length);
     onSave(updatedDocumentary);
   };
 
@@ -188,7 +190,7 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
             </div>
             {calculateTotalDuration() > 141 && (
               <div className="info-warning">
-                ⚠️ Exceeds Veo limit (141s)
+                ⚠️ Exceeds limit (141s)
               </div>
             )}
           </div>
@@ -263,10 +265,10 @@ const DocumentaryEditModal: React.FC<DocumentaryEditModalProps> = ({
                     <div className={`word-count ${getWordCount(segment.narration || '') > MAX_NARRATION_WORDS ? 'word-count-exceeded' : getWordCount(segment.narration || '') >= 10 ? 'word-count-optimal' : ''}`}>
                       {getWordCount(segment.narration || '')} / {MAX_NARRATION_WORDS} words
                       {getWordCount(segment.narration || '') > MAX_NARRATION_WORDS && (
-                        <span className="warning-icon" title="Exceeds Veo limit">⚠️</span>
+                        <span className="warning-icon" title="Exceeds limit">⚠️</span>
                       )}
                       {getWordCount(segment.narration || '') >= 10 && getWordCount(segment.narration || '') <= MAX_NARRATION_WORDS && (
-                        <span className="success-icon" title="Optimal for Veo">✓</span>
+                        <span className="success-icon" title="Optimal for generation">✓</span>
                       )}
                     </div>
                   </div>

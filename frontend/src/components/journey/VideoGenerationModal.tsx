@@ -130,6 +130,7 @@ const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                   </motion.button>
                 ))}
               </div>
+              <div style={{ textAlign: 'center', marginTop: '5px', fontSize: '12px', color: 'var(--text-primary)' }}>Only 720p is supported if Generating Full Documentary</div>
             </div>
 
             {/* Aspect Ratio */}

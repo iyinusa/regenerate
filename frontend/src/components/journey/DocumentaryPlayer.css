@@ -481,8 +481,9 @@
 .generation-status {
   text-align: center;
   color: var(--text-primary);
-  max-width: 400px;
+  width: 100%;
   padding: 2rem;
+  text-align: center;
 }
 
 .generation-icon {
