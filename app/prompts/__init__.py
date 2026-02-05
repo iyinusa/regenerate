@@ -9,6 +9,8 @@ Uses Pydantic models for structured output schemas (production-grade approach).
 from app.prompts.profile_prompts import (
     get_profile_extraction_prompt,
     get_profile_enrichment_prompt,
+    get_resume_extraction_prompt,
+    get_deep_research_enrichment_prompt,
     PROFILE_EXTRACTION_SCHEMA,  # Kept for backwards compatibility
 )
 
@@ -53,6 +55,8 @@ __all__ = [
     # Profile Prompts
     "get_profile_extraction_prompt",
     "get_profile_enrichment_prompt",
+    "get_resume_extraction_prompt",
+    "get_deep_research_enrichment_prompt",
     "PROFILE_EXTRACTION_SCHEMA",
     # Journey Prompts
     "get_journey_structuring_prompt",

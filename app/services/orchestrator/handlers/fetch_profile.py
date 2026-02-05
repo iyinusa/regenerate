@@ -1,6 +1,6 @@
 """Profile Fetching Handler.
 
-Handles profile fetching from various sources including LinkedIn and standard URLs.
+Handles profile fetching from various sources including LinkedIn, standard URLs, and Resume PDFs.
 """
 
 import asyncio
@@ -8,11 +8,12 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
+import httpx
 from google.genai import types
 
 from app.services.orchestrator.handlers.base import BaseTaskHandler
 from app.services.orchestrator.models import Task, TaskPlan, TaskType
-from app.prompts import get_profile_extraction_prompt, ProfileExtractionResult
+from app.prompts import get_profile_extraction_prompt, get_resume_extraction_prompt, ProfileExtractionResult
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class FetchProfileHandler(BaseTaskHandler):
     """Handler for profile fetching task."""
     
     async def execute(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
-        """Handle profile fetching task with LinkedIn-aware extraction."""
+        """Handle profile fetching task with LinkedIn-aware extraction and resume PDF support."""
         from app.services.linkedin_service import linkedin_service
         
         task.message = "Analysing profile source..."
@@ -33,6 +34,11 @@ class FetchProfileHandler(BaseTaskHandler):
         
         source_url = plan.source_url
         guest_user_id = plan.options.get('guest_user_id')
+        source_type = plan.options.get('source_type', 'url')
+        
+        # Check if this is a resume PDF source
+        if source_type == 'resume':
+            return await self._handle_resume_extraction(job_id, plan, task, source_url)
         
         # Detect if this is a LinkedIn URL
         is_linkedin = linkedin_service.is_linkedin_url(source_url)
@@ -41,6 +47,180 @@ class FetchProfileHandler(BaseTaskHandler):
             return await self._handle_linkedin_profile(job_id, plan, task, source_url, guest_user_id)
         else:
             return await self._handle_standard_profile(job_id, plan, task, source_url)
+    
+    async def _handle_resume_extraction(
+        self,
+        job_id: str,
+        plan: TaskPlan,
+        task: Task,
+        resume_url: str
+    ) -> Dict[str, Any]:
+        """Handle resume PDF extraction using Gemini 3's native PDF processing.
+        
+        This method downloads the PDF from GCS and passes it directly to Gemini 3
+        for comprehensive data extraction.
+        """
+        from app.services.orchestrator.utils.parsing import parse_and_validate_response
+        
+        task.message = "Downloading resume PDF..."
+        task.progress = 20
+        await self.update_progress(job_id, task)
+        
+        try:
+            # Download PDF from GCS URL
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.get(resume_url)
+                response.raise_for_status()
+                pdf_data = response.content
+            
+            logger.info(f"Downloaded resume PDF: {len(pdf_data)} bytes")
+            
+            task.message = "Extracting profile from resume..."
+            task.progress = 40
+            await self.update_progress(job_id, task)
+            
+            # Get the resume extraction prompt
+            prompt = get_resume_extraction_prompt()
+            
+            # Use Gemini 3's PDF processing capability
+            try:
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=[
+                        types.Part.from_bytes(
+                            data=pdf_data,
+                            mime_type="application/pdf"
+                        ),
+                        prompt
+                    ],
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],  # Enable search for enrichment
+                        response_mime_type="application/json",
+                        response_json_schema=ProfileExtractionResult.model_json_schema()
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Gemini PDF extraction failed with search, retrying without: {e}")
+                # Retry without google_search if it fails
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=[
+                        types.Part.from_bytes(
+                            data=pdf_data,
+                            mime_type="application/pdf"
+                        ),
+                        prompt
+                    ],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=ProfileExtractionResult.model_json_schema()
+                    )
+                )
+            
+            task.progress = 70
+            task.message = "Processing extracted data..."
+            await self.update_progress(job_id, task)
+            
+            result = parse_and_validate_response(
+                response.text,
+                ProfileExtractionResult,
+                fallback_to_dict=True
+            )
+            
+            # Add metadata
+            result['source_url'] = resume_url
+            result['extraction_timestamp'] = datetime.utcnow().isoformat()
+            result['extraction_method'] = 'resume_pdf'
+            result['source_type'] = 'resume'
+            
+            # Perform additional search enrichment if we have a name
+            if result.get('name'):
+                task.progress = 80
+                task.message = "Searching for additional profile links..."
+                await self.update_progress(job_id, task)
+                
+                # Use Google Search to find related links for this person
+                search_result = await self._search_for_related_links(result)
+                if search_result:
+                    # Merge any discovered links
+                    existing_links = result.get('related_links', []) or []
+                    new_links = search_result.get('related_links', []) or []
+                    result['related_links'] = existing_links + new_links
+                    
+                    # Update social links if found
+                    for field in ['linkedin', 'github', 'website']:
+                        if not result.get(field) and search_result.get(field):
+                            result[field] = search_result[field]
+            
+            logger.info(f"Resume extraction complete: {result.get('name', 'Unknown')}")
+            return result
+            
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to download resume PDF: {e}")
+            raise Exception(f"Failed to download resume: {str(e)}")
+        except Exception as e:
+            logger.error(f"Resume extraction failed: {e}")
+            raise
+    
+    async def _search_for_related_links(self, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Search for related links based on extracted profile data."""
+        name = profile_data.get('name', '')
+        title = profile_data.get('title', '')
+        
+        if not name:
+            return {}
+        
+        # Build search query
+        search_parts = [name]
+        if title:
+            search_parts.append(title)
+        
+        # Get company from experiences if available
+        experiences = profile_data.get('experiences', [])
+        if experiences and len(experiences) > 0:
+            company = experiences[0].get('company', '')
+            if company:
+                search_parts.append(company)
+        
+        search_query = ' '.join(search_parts)
+        
+        prompt = f"""Use Google Search to find professional links and mentions for this person:
+        
+Name: {name}
+Title: {title}
+Search Query: "{search_query}"
+
+Find and return:
+1. LinkedIn profile URL if exists
+2. GitHub profile URL if exists  
+3. Personal website or portfolio
+4. Related articles, interviews, or mentions
+5. Any other professional profiles
+
+Return a JSON object with:
+- linkedin: LinkedIn URL or null
+- github: GitHub URL or null
+- website: Personal website or null
+- related_links: Array of discovered links with url, title, type, description"""
+
+        try:
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}],
+                    response_mime_type="application/json"
+                )
+            )
+            
+            import json
+            return json.loads(response.text)
+        except Exception as e:
+            logger.warning(f"Related links search failed: {e}")
+            return {}
     
     async def _handle_linkedin_profile(
         self, 

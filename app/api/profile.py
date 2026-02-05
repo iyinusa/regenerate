@@ -115,20 +115,81 @@ async def update_passport(
     
     logger.info(f"Passport saved successfully. Returning: {structured_data.get('passport')}")
     return {"passport": structured_data["passport"]}
+
+
+@router.post(
+    "/resume/upload",
+    response_model=Dict[str, str],
+    summary="Upload Resume PDF",
+    description="Upload a resume PDF to GCS and return the public URL for profile extraction."
+)
+async def upload_resume(
+    file: UploadFile = File(...),
+):
+    """
+    Upload a resume PDF to GCS and return the public URL.
+    This endpoint is accessible to guests (no auth required) for initial profile creation.
+    """
+    # Validate file type
+    if not file.content_type or file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400, 
+            detail="File must be a PDF document"
+        )
+    
+    # Validate file size (max 10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File size exceeds maximum limit of 10MB"
+        )
+    
+    # Reset file pointer for upload
+    await file.seek(0)
+    
+    # Generate unique filename
+    from io import BytesIO
+    import uuid
+    file_id = uuid.uuid4().hex[:12]
+    filename = f"resume_{file_id}_{int(time.time())}.pdf"
+    
+    try:
+        # Upload to GCS in resumes folder
+        # Use a generic folder for guest uploads
+        url = await gcs_storage.upload_file_object(
+            BytesIO(content),
+            "uploads",  # Generic folder for guest resume uploads
+            filename,
+            "application/pdf",
+            folder="resumes"
+        )
+        logger.info(f"Resume uploaded successfully: {url}")
+        return {"url": url, "filename": filename}
+    except Exception as e:
+        logger.error(f"Failed to upload resume: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload resume: {str(e)}")
+
+
 @router.post(
     "/generate",
     response_model=ProfileGenerateResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Start Profile Generation",
-    description="Initiate the profile data extraction and analysis process from a given URL with CoT task planning."
+    description="Initiate the profile data extraction and analysis process from a URL or uploaded resume PDF with CoT task planning."
 )
 async def generate_profile(
     request: ProfileGenerateRequest,
     db: AsyncSession = Depends(get_db)
 ) -> ProfileGenerateResponse:
-    """Generate profile from URL with Chain of Thought task planning.
+    """Generate profile from URL or Resume PDF with Chain of Thought task planning.
     
-    This endpoint:
+    This endpoint supports two source types:
+    1. URL: LinkedIn, Portfolio, GitHub, or other professional profile URLs
+    2. Resume: Uploaded PDF resume (use /resume/upload first to get the file URL)
+    
+    The endpoint:
     1. Creates a task plan using CoT reasoning
     2. Starts background execution of tasks
     3. Returns job ID for tracking progress via polling or WebSocket
@@ -136,22 +197,48 @@ async def generate_profile(
     Connect to WebSocket at /api/v1/ws/tasks/{job_id} for real-time updates.
     
     Args:
-        request: Profile generation request with URL and options
+        request: Profile generation request with URL/resume and options
         db: Database session
         
     Returns:
         Response with job ID and initial status
     """
+    from app.schemas.profile import ProfileSourceType
+    
     try:
-        logger.info(f"Starting profile generation for URL: {request.url}")
+        # Validate request based on source type
+        source_type = request.source_type
+        
+        if source_type == ProfileSourceType.URL:
+            if not request.url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="URL is required when source_type is 'url'"
+                )
+            source_identifier = request.url
+            logger.info(f"Starting profile generation from URL: {request.url}")
+        elif source_type == ProfileSourceType.RESUME:
+            if not request.resume_file_url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="resume_file_url is required when source_type is 'resume'"
+                )
+            source_identifier = request.resume_file_url
+            logger.info(f"Starting profile generation from Resume: {request.resume_file_url}")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid source_type: {source_type}"
+            )
         
         # Start the extraction process with orchestrator
         job_id = await profile_service.start_profile_extraction(
-            url=request.url,
+            url=source_identifier,
             guest_user_id=request.guest_user_id,
             db=db,
             include_github=request.include_github,
-            use_orchestrator=True  # Enable CoT task orchestration
+            use_orchestrator=True,
+            source_type=source_type.value  # Pass source type to service
         )
         
         return ProfileGenerateResponse(

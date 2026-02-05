@@ -57,16 +57,18 @@ class ProfileExtractionService:
         guest_user_id: str, 
         db: AsyncSession, 
         include_github: bool = False,
-        use_orchestrator: bool = True
+        use_orchestrator: bool = True,
+        source_type: str = "url"
     ) -> str:
         """Start profile extraction process with CoT task planning.
         
         Args:
-            url: Profile URL to extract data from
+            url: Profile URL or Resume GCS URL to extract data from
             guest_user_id: Unique guest user ID
             db: Database session
             include_github: Whether to include GitHub OAuth
             use_orchestrator: Whether to use the new task orchestrator
+            source_type: Type of source - 'url' for links or 'resume' for PDF
             
         Returns:
             Job ID for tracking the extraction process
@@ -127,7 +129,8 @@ class ProfileExtractionService:
                     "include_github": include_github,
                     "guest_user_id": guest_user_id,
                     "user_id": user.id,
-                    "history_id": history.id
+                    "history_id": history.id,
+                    "source_type": source_type  # Pass source type for resume handling
                 }
             )
             

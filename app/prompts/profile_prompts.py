@@ -280,3 +280,220 @@ Location: {existing_data.get('location', 'Unknown')}
 - Flag any potential identity mismatches
 
 Return a JSON object with the enriched profile data."""
+
+def get_resume_extraction_prompt() -> str:
+    """Generate the resume PDF extraction prompt for Gemini 3.
+    
+    This prompt is used when extracting profile data from an uploaded PDF resume.
+    It leverages Gemini 3's native PDF processing capabilities.
+    
+    Returns:
+        Formatted prompt string for Gemini 3 resume extraction
+    """
+    return """You are a precise data extraction assistant using Gemini 3. Your goal is to extract comprehensive profile information from the provided resume PDF document.
+
+**CORE DIRECTIVE: COMPREHENSIVE EXTRACTION FROM PDF**
+Extract ALL relevant professional information from the resume document. Be thorough and accurate.
+
+**EXTRACTION FIELDS:**
+
+1. **Basic Information:**
+   - name: Full name of the person
+   - passport: Profile photo if visible in the PDF (otherwise null)
+   - title: Current or most recent job title/professional role
+   - location: Geographic location if mentioned
+   - bio: Professional summary/objective statement if present
+
+2. **Professional Experience:**
+   For each position, extract:
+   - company: Company/organization name
+   - title: Job title held
+   - duration: Human-readable duration (e.g., "Jan 2020 - Present")
+   - start_date: Start date (ISO format if possible)
+   - end_date: End date or "Present"
+   - description: Job description and responsibilities
+   - highlights: Key achievements and accomplishments
+
+3. **Education:**
+   For each educational entry:
+   - institution: School/university name
+   - degree: Degree type (BS, MS, PhD, etc.)
+   - field: Field of study/major
+   - duration: Time period
+   - start_date/end_date: Dates if available
+
+4. **Skills:**
+   - Extract ALL mentioned skills (technical, soft skills, tools, languages)
+   - Include skill categories if grouped in the resume
+
+5. **Projects:**
+   For each project mentioned:
+   - name: Project name
+   - description: What the project does
+   - technologies: Tech stack used
+   - impact: Measurable outcomes if mentioned
+   - date: When it was done
+
+6. **Achievements & Certifications:**
+   - Awards, recognitions, publications
+   - Professional certifications with dates and issuers
+
+7. **Contact & Links:**
+   - email: Contact email if present
+   - website: Personal website/portfolio URL
+   - linkedin: LinkedIn profile URL if mentioned
+   - github: GitHub profile URL if mentioned
+   - social_links: Other social/professional links
+
+8. **Related Links:**
+   - Extract any URLs mentioned in the resume for enrichment
+   - Include portfolio links, project URLs, publication links
+
+**EXTRACTION RULES:**
+1. Extract EXACTLY what is in the document - do not fabricate data
+2. If a field is not present, return null for strings or empty arrays []
+3. Preserve original formatting for dates when possible
+4. Capture ALL experiences, not just recent ones
+5. Extract quantifiable achievements (numbers, percentages, metrics)
+6. Include any publications, patents, or research mentioned
+
+**OUTPUT FORMAT:**
+Return a valid JSON object matching the ProfileExtractionResult schema.
+Ensure all dates are extracted to enable timeline generation.
+
+Return the complete extracted profile data in JSON format."""
+
+
+def get_deep_research_enrichment_prompt(profile_data: Dict[str, Any], related_links: list) -> str:
+    """Generate prompt for deep research enrichment using Gemini 3.
+    
+    This prompt leverages Gemini 3's url_context and google_search tools
+    to perform comprehensive research on related links instead of web scraping.
+    
+    Args:
+        profile_data: Existing profile data from fetch stage
+        related_links: List of related link objects with url, title, type
+        
+    Returns:
+        Formatted prompt string for Gemini 3 deep research
+    """
+    name = profile_data.get('name', 'Unknown')
+    title = profile_data.get('title', 'Unknown')
+    company = None
+    
+    # Try to get current company from experiences
+    experiences = profile_data.get('experiences', [])
+    if experiences and len(experiences) > 0:
+        company = experiences[0].get('company', '')
+    
+    # Format related links for the prompt
+    links_formatted = []
+    for link in related_links[:20]:  # Limit to top 20 links
+        if isinstance(link, dict) and link.get('url'):
+            link_str = f"- URL: {link['url']}"
+            if link.get('title'):
+                link_str += f"\n  Title: {link['title']}"
+            if link.get('type'):
+                link_str += f"\n  Type: {link['type']}"
+            if link.get('description'):
+                link_str += f"\n  Description: {link['description']}"
+            links_formatted.append(link_str)
+    
+    links_str = "\n".join(links_formatted) if links_formatted else "No specific links provided"
+    
+    return f"""You are a professional research assistant using Gemini 3's advanced capabilities. Your task is to perform deep research to enrich a professional profile.
+
+**SUBJECT PROFILE:**
+Name: {name}
+Current Title: {title}
+{f"Company: {company}" if company else ""}
+
+**RELATED LINKS TO INVESTIGATE:**
+{links_str}
+
+**RESEARCH DIRECTIVE:**
+Use url_context tool to analyze each of the related links above and extract relevant information about this person.
+Additionally, use google_search to find any other relevant mentions, articles, or achievements.
+
+**EXTRACTION GOALS:**
+
+1. **Article Content:**
+   For each link, extract:
+   - Main content/article text relevant to the person
+   - Publication date if available
+   - Author if applicable
+   - Key quotes or mentions about the person
+   - Context of why this person is mentioned
+
+2. **Additional Achievements:**
+   - Awards or recognitions mentioned
+   - Speaking engagements or conferences
+   - Publications or research papers
+   - Interviews or features
+
+3. **Project Details:**
+   - Project descriptions from portfolio links
+   - Technical details and impact metrics
+   - Technologies and methodologies used
+
+4. **Professional Insights:**
+   - Industry expertise demonstrated
+   - Thought leadership content
+   - Community involvement
+
+5. **New Links Discovered:**
+   - Any additional relevant links found during research
+   - Social profiles not already captured
+
+**VERIFICATION RULES:**
+1. ONLY include information that is DEFINITELY about the same person
+2. Verify identity using name, title, and company matches
+3. DO NOT include information about different people with similar names
+4. If uncertain about identity match, exclude the content
+
+**OUTPUT FORMAT:**
+Return a JSON object with:
+{{
+    "enriched_content": [
+        {{
+            "url": "source URL",
+            "title": "page/article title",
+            "content_summary": "relevant content about the person",
+            "key_points": ["point1", "point2"],
+            "publication_date": "date if found",
+            "relevance_score": 1-10
+        }}
+    ],
+    "additional_achievements": [
+        {{
+            "title": "achievement name",
+            "date": "when received",
+            "description": "details",
+            "source": "where found"
+        }}
+    ],
+    "additional_projects": [
+        {{
+            "name": "project name",
+            "description": "what it does",
+            "technologies": ["tech1", "tech2"],
+            "impact": "measurable outcomes",
+            "url": "project URL if any"
+        }}
+    ],
+    "additional_skills": ["skill1", "skill2"],
+    "new_links_discovered": [
+        {{
+            "url": "new URL",
+            "title": "page title",
+            "type": "article/project/social/etc",
+            "description": "why relevant"
+        }}
+    ],
+    "profile_updates": {{
+        "bio_additions": "new bio content to add",
+        "title_refinement": "more accurate title if found"
+    }}
+}}
+
+Ensure thorough investigation of each link while maintaining strict identity verification."""

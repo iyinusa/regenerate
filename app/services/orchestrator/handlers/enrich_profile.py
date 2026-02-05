@@ -1,23 +1,29 @@
 """Profile Enrichment Handler.
 
-Handles profile enrichment with web scraping and GitHub integration.
+Handles profile enrichment using Gemini 3 Deep Research and GitHub integration.
+Uses Gemini's url_context and google_search tools instead of traditional web scraping.
 """
 
+import asyncio
+import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
+from google.genai import types
+
 from app.services.orchestrator.handlers.base import BaseTaskHandler
 from app.services.orchestrator.models import Task, TaskPlan, TaskType
+from app.prompts import get_deep_research_enrichment_prompt, ProfileExtractionResult
 
 logger = logging.getLogger(__name__)
 
 
 class EnrichProfileHandler(BaseTaskHandler):
-    """Handler for profile enrichment task."""
+    """Handler for profile enrichment task using Gemini 3 Deep Research."""
     
     async def execute(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
-        """Handle profile enrichment task with web scraping."""
+        """Handle profile enrichment task with Gemini 3 Deep Research."""
         task.message = "Starting enrichment process..."
         task.progress = 10
         await self.update_progress(job_id, task)
@@ -31,80 +37,93 @@ class EnrichProfileHandler(BaseTaskHandler):
         related_links = profile_data.get('related_links', [])
         
         task.progress = 20
-        task.message = f"Found {len(related_links)} related links to enrich"
+        task.message = f"Found {len(related_links)} related links to research"
         await self.update_progress(job_id, task)
         
         enriched_data = {**profile_data}
-        scraped_content = []
+        deep_research_content = []
         
-        # Scrape content from related links using BeautifulSoup
-        if related_links:
+        # Use Gemini 3 Deep Research for related links instead of web scraping
+        if related_links and self.genai_client:
             task.progress = 30
-            task.message = "Scraping content from related links..."
+            task.message = "Performing deep research on related links..."
             await self.update_progress(job_id, task)
             
-            from app.services.web_scraper import web_scraper
-            
-            # Extract URLs, excluding the primary source URL
-            primary_url = profile_data.get('source_url', '')
-            urls_to_scrape = [
-                link['url'] for link in related_links 
-                if link.get('url') and link['url'] != primary_url
-            ]
-            
-            # Limit to top 20 links
-            urls_to_scrape = urls_to_scrape[:20]
-            
-            logger.info(f"Scraping {len(urls_to_scrape)} URLs for enrichment")
-            
             try:
-                # Scrape all URLs concurrently with rate limiting
-                scraped_results = await web_scraper.scrape_multiple_urls(
-                    urls=urls_to_scrape,
-                    max_concurrent=5
+                research_result = await self._perform_deep_research(
+                    profile_data, 
+                    related_links, 
+                    job_id, 
+                    task
                 )
                 
-                # Filter successful scrapes and format for Gemini
-                for result in scraped_results:
-                    if result.get('success'):
-                        scraped_content.append({
-                            'url': result['url'],
-                            'title': result.get('title', ''),
-                            'description': result.get('description', ''),
-                            'content': result.get('content', '')[:3000],
-                            'author': result.get('author', ''),
-                            'publisher': result.get('publisher', ''),
-                            'domain': result.get('domain', ''),
-                            'published_date': result.get('published_date', result.get('publication_date', '')),
-                            'featured_image': result.get('featured_image', ''),
-                            'headings': result.get('headings', [])[:8],
-                            'quality_score': result.get('quality_score', 5.0),
-                        })
+                if research_result:
+                    deep_research_content = research_result.get('enriched_content', [])
+                    
+                    # Merge additional achievements
+                    additional_achievements = research_result.get('additional_achievements', [])
+                    if additional_achievements:
+                        existing_achievements = enriched_data.get('achievements', []) or []
+                        enriched_data['achievements'] = existing_achievements + additional_achievements
+                    
+                    # Merge additional projects
+                    additional_projects = research_result.get('additional_projects', [])
+                    if additional_projects:
+                        existing_projects = enriched_data.get('projects', []) or []
+                        enriched_data['projects'] = existing_projects + additional_projects
+                    
+                    # Merge additional skills
+                    additional_skills = research_result.get('additional_skills', [])
+                    if additional_skills:
+                        existing_skills = enriched_data.get('skills', []) or []
+                        # Deduplicate skills
+                        all_skills = list(set(existing_skills + additional_skills))
+                        enriched_data['skills'] = all_skills
+                    
+                    # Add new discovered links
+                    new_links = research_result.get('new_links_discovered', [])
+                    if new_links:
+                        existing_links = enriched_data.get('related_links', []) or []
+                        enriched_data['related_links'] = existing_links + new_links
+                    
+                    # Apply profile updates
+                    profile_updates = research_result.get('profile_updates', {})
+                    if profile_updates.get('bio_additions'):
+                        current_bio = enriched_data.get('bio', '') or ''
+                        enriched_data['bio'] = current_bio + '\n\n' + profile_updates['bio_additions']
+                    
+                    logger.info(f"Deep research enriched: {len(deep_research_content)} content items, "
+                               f"{len(additional_achievements)} achievements, "
+                               f"{len(additional_projects)} projects")
                 
-                # Sort scraped content by quality score (descending)
-                scraped_content = sorted(scraped_content, key=lambda x: x.get('quality_score', 5.0), reverse=True)
-                
-                logger.info(f"Successfully scraped {len(scraped_content)} out of {len(urls_to_scrape)} URLs")
-                if scraped_content:
-                    avg_quality = sum(item.get('quality_score', 5.0) for item in scraped_content) / len(scraped_content)
-                    logger.info(f"Average content quality score: {avg_quality:.2f}/10.0")
-                
-            except Exception as scrape_error:
-                logger.error(f"Error during web scraping: {scrape_error}")
+            except Exception as research_error:
+                logger.error(f"Error during deep research: {research_error}")
+                # Fall back to basic link info without scraping
+                deep_research_content = [
+                    {
+                        'url': link.get('url', ''),
+                        'title': link.get('title', ''),
+                        'type': link.get('type', 'unknown'),
+                        'description': link.get('description', ''),
+                        'content_summary': 'Research pending'
+                    }
+                    for link in related_links[:10] if link.get('url')
+                ]
         
         task.progress = 60
-        task.message = f"Scraped {len(scraped_content)} articles/pages"
+        task.message = f"Researched {len(deep_research_content)} sources"
         await self.update_progress(job_id, task)
         
-        # Add scraped content to enriched data
-        enriched_data['scraped_content'] = scraped_content
+        # Add research content to enriched data (replaces scraped_content)
+        enriched_data['deep_research_content'] = deep_research_content
         enriched_data['enrichment_stats'] = {
             'related_links_found': len(related_links),
-            'links_scraped': len(urls_to_scrape) if related_links else 0,
-            'successful_scrapes': len(scraped_content),
+            'links_researched': min(len(related_links), 20),
+            'successful_research': len(deep_research_content),
+            'enrichment_method': 'gemini_deep_research'
         }
         
-        # Check for GitHub OAuth enrichment
+        # Check for GitHub OAuth enrichment (RETAINED - important for profile)
         guest_user_id = plan.options.get('guest_user_id')
         if guest_user_id:
             task.progress = 70
@@ -115,6 +134,7 @@ class EnrichProfileHandler(BaseTaskHandler):
             if github_enrichment:
                 enriched_data['github_data'] = github_enrichment
                 enriched_data['enrichment_stats']['github_enriched'] = True
+                logger.info(f"GitHub enrichment added: {github_enrichment.get('total_repos', 0)} repos")
         
         task.progress = 90
         task.message = "Enrichment complete"
@@ -127,6 +147,92 @@ class EnrichProfileHandler(BaseTaskHandler):
         logger.info(f"Profile enrichment complete: {enriched_data.get('enrichment_stats')}")
         
         return enriched_data
+    
+    async def _perform_deep_research(
+        self,
+        profile_data: Dict[str, Any],
+        related_links: List[Dict[str, Any]],
+        job_id: str,
+        task: Task
+    ) -> Optional[Dict[str, Any]]:
+        """Perform deep research using Gemini 3's url_context and google_search tools.
+        
+        This replaces the traditional web scraping approach with AI-powered research.
+        """
+        if not self.genai_client:
+            logger.warning("Gemini client not available for deep research")
+            return None
+        
+        # Filter to valid URLs only
+        valid_links = [
+            link for link in related_links 
+            if isinstance(link, dict) and link.get('url')
+        ][:20]  # Limit to 20 links
+        
+        if not valid_links:
+            logger.info("No valid links to research")
+            return None
+        
+        task.message = f"Deep researching {len(valid_links)} links..."
+        await self.update_progress(job_id, task)
+        
+        # Get the deep research prompt
+        prompt = get_deep_research_enrichment_prompt(profile_data, valid_links)
+        
+        try:
+            # Use Gemini 3 with url_context and google_search for comprehensive research
+            response = await asyncio.to_thread(
+                self.genai_client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"url_context": {}}, {"google_search": {}}],
+                    response_mime_type="application/json"
+                )
+            )
+            
+            result = json.loads(response.text)
+            
+            # Sort enriched content by relevance score if available
+            if 'enriched_content' in result:
+                result['enriched_content'] = sorted(
+                    result['enriched_content'],
+                    key=lambda x: x.get('relevance_score', 5),
+                    reverse=True
+                )
+            
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse deep research response: {e}")
+            # Try to extract partial data
+            try:
+                # Attempt to clean and parse
+                text = response.text.strip()
+                if text.startswith('```json'):
+                    text = text[7:]
+                if text.endswith('```'):
+                    text = text[:-3]
+                return json.loads(text)
+            except:
+                return None
+        except Exception as e:
+            logger.error(f"Deep research failed: {e}")
+            # Try without url_context if it fails
+            try:
+                response = await asyncio.to_thread(
+                    self.genai_client.models.generate_content,
+                    model="gemini-3-flash-preview",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"google_search": {}}],
+                        response_mime_type="application/json"
+                    )
+                )
+                return json.loads(response.text)
+            except Exception as fallback_error:
+                logger.error(f"Deep research fallback also failed: {fallback_error}")
+                return None
     
     async def _enrich_with_github(
         self, 

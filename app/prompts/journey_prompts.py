@@ -141,7 +141,8 @@ TIMELINE_SCHEMA: Dict[str, Any] = {
                     "color": {"type": "string"}
                 }
             }
-        }
+        },
+        "required": ["events"]
     }
 }
 
@@ -180,7 +181,8 @@ DOCUMENTARY_SCHEMA: Dict[str, Any] = {
             }
         },
         "opening_hook": {"type": "string", "description": "Compelling opening statement"},
-        "closing_statement": {"type": "string", "description": "Memorable conclusion"}
+        "closing_statement": {"type": "string", "description": "Memorable conclusion"},
+        "required": ["title", "tagline", "opening_hook", "segments"]
     }
 }
 
@@ -340,13 +342,13 @@ Each segment needs:
 - Mood helps determine voice quality (warm/uplifting, clear/authoritative, energetic, thoughtful, confident)
 
 **DOCUMENTARY FLOW:**
-1. Opening Hook - Grab attention immediately
+1. Opening Hook - Grab attention immediately (120 characters max)
 2. Origin Story - Where it all began
 3. Journey Highlights - Key milestones and achievements
 4. Challenges & Growth - Obstacles overcome
 5. Impact & Legacy - What they've accomplished
 6. Future Vision - What's next (optional)
-7. Closing Statement - Memorable conclusion
+7. Closing Statement - Memorable conclusion (100 characters max)
 
 **VISUAL DESCRIPTIONS FOR VEO:**
 Be specific about:

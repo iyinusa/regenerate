@@ -9,6 +9,9 @@ import './Hero.css';
 
 gsap.registerPlugin(TextPlugin);
 
+// Source type for profile generation
+type SourceType = 'url' | 'resume';
+
 interface HeroProps {
   onGenerate: (data: { url: string; jobId?: string; status?: string }) => void;
 }
@@ -19,6 +22,7 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
   const { user, isAuthenticated, guestId, loading: authLoading, logout } = useAuth();
@@ -37,6 +41,11 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
     github: { connected: false },
     linkedin: { connected: false }
   });
+  
+  // New state for source type toggle
+  const [sourceType, setSourceType] = useState<SourceType>('url');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   useEffect(() => {
     // Test API connection
@@ -134,29 +143,108 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
   };
 
   async function handleGenerate() {
-    if (!url.trim()) return;
+    // Validate based on source type
+    if (sourceType === 'url' && !url.trim()) {
+      setError('Please enter a profile URL');
+      return;
+    }
+    if (sourceType === 'resume' && !resumeFile) {
+      setError('Please select a resume PDF to upload');
+      return;
+    }
     
     setIsLoading(true);
     setError('');
+    setUploadProgress('');
     
     try {
-      // Call FastAPI backend to start profile generation
-      const response = await apiClient.generateProfile({
-        url: url.trim(),
-        include_github: false
-      });
+      let response;
       
-      onGenerate({
-        url: url.trim(),
-        jobId: response.job_id,
-        status: response.status
-      });
+      if (sourceType === 'resume' && resumeFile) {
+        // Step 1: Upload the resume PDF
+        setUploadProgress('Uploading resume...');
+        const uploadResult = await apiClient.uploadResume(resumeFile);
+        
+        // Step 2: Start profile generation with resume URL
+        setUploadProgress('Analysing resume...');
+        response = await apiClient.generateProfile({
+          source_type: 'resume',
+          resume_file_url: uploadResult.url,
+          include_github: false
+        });
+        
+        onGenerate({
+          url: uploadResult.url,
+          jobId: response.job_id,
+          status: response.status
+        });
+      } else {
+        // URL-based profile generation
+        response = await apiClient.generateProfile({
+          source_type: 'url',
+          url: url.trim(),
+          include_github: false
+        });
+        
+        onGenerate({
+          url: url.trim(),
+          jobId: response.job_id,
+          status: response.status
+        });
+      }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Profile generation failed:', err);
-      setError('Failed to start profile generation. Please check your URL.');
+      setError(err.message || 'Failed to start profile generation. Please try again.');
     } finally {
       setIsLoading(false);
+      setUploadProgress('');
+    }
+  }
+  
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        setError('Please upload a PDF file');
+        return;
+      }
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size exceeds 10MB limit');
+        return;
+      }
+      setResumeFile(file);
+      setError('');
+    }
+  }
+  
+  function handleFileDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        setError('Please upload a PDF file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size exceeds 10MB limit');
+        return;
+      }
+      setResumeFile(file);
+      setError('');
+    }
+  }
+  
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+  }
+  
+  function clearResumeFile() {
+    setResumeFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   }
 
@@ -290,33 +378,123 @@ const Hero: React.FC<HeroProps> = ({ onGenerate }) => {
           </p>
 
           <div ref={ctaRef} className="cta-section">
-            <div className="input-wrapper glass-morphism">
-              <div className="cli-prefix">
-                <span className="prompt-user">source</span><span className="prompt-symbol">➜</span>
-              </div>
-              <input
-                ref={urlInputRef}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyPress={handleKeyPress}
-                type="url"
-                placeholder="Paste LinkedIn, Portfolio, or GitHub URL"
-                className="cli-input"
-                disabled={isLoading}
-                spellCheck="false"
-              />
+            {/* Source Type Toggle */}
+            <div className="source-toggle">
               <button
-                onClick={handleGenerate}
-                disabled={isLoading || !url.trim()}
-                className="refactor-run-button"
+                className={`toggle-btn ${sourceType === 'url' ? 'active' : ''}`}
+                onClick={() => { setSourceType('url'); setError(''); }}
+                disabled={isLoading}
               >
-                {isLoading ? (
-                  <div className="loader"></div>
-                ) : (
-                  <span>REGEN NOW →</span>
-                )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+                </svg>
+                Link
+              </button>
+              <button
+                className={`toggle-btn ${sourceType === 'resume' ? 'active' : ''}`}
+                onClick={() => { setSourceType('resume'); setError(''); }}
+                disabled={isLoading}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01V17h2.01L14.5 12.51l-2.01-2.01L8 15.01zm6.87-5.9l1.03 1.03c.12.12.12.32 0 .44l-.9.9-1.47-1.47.9-.9c.12-.12.32-.12.44 0z"/>
+                </svg>
+                Resume
               </button>
             </div>
+            
+            {/* URL Input - shown when source type is 'url' */}
+            {sourceType === 'url' && (
+              <div className="input-wrapper glass-morphism">
+                <div className="cli-prefix">
+                  <span className="prompt-user">source</span><span className="prompt-symbol">➜</span>
+                </div>
+                <input
+                  ref={urlInputRef}
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  type="url"
+                  placeholder="Paste LinkedIn, Portfolio, or GitHub URL"
+                  className="cli-input"
+                  disabled={isLoading}
+                  spellCheck="false"
+                />
+                <button
+                  onClick={handleGenerate}
+                  disabled={isLoading || !url.trim()}
+                  className="refactor-run-button"
+                >
+                  {isLoading ? (
+                    <div className="loader"></div>
+                  ) : (
+                    <span>REGEN NOW →</span>
+                  )}
+                </button>
+              </div>
+            )}
+            
+            {/* Resume Upload - shown when source type is 'resume' */}
+            {sourceType === 'resume' && (
+              <div className="resume-upload-wrapper glass-morphism">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                  disabled={isLoading}
+                />
+                
+                {!resumeFile ? (
+                  <div 
+                    className="resume-dropzone"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={handleFileDrop}
+                    onDragOver={handleDragOver}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="upload-icon">
+                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm5-6v4h2v-4h3l-4-4-4 4h3z"/>
+                    </svg>
+                    <span className="dropzone-text">
+                      Drop your resume PDF here or <span className="browse-link">browse</span>
+                    </span>
+                    <span className="dropzone-hint">PDF only, max 10MB</span>
+                  </div>
+                ) : (
+                  <div className="resume-selected">
+                    <div className="file-info">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="pdf-icon">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                      </svg>
+                      <span className="file-name">{resumeFile.name}</span>
+                      <span className="file-size">({(resumeFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      <button 
+                        className="remove-file-btn"
+                        onClick={clearResumeFile}
+                        disabled={isLoading}
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isLoading}
+                      className="refactor-run-button"
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="loader"></div>
+                          {uploadProgress && <span className="upload-status">{uploadProgress}</span>}
+                        </>
+                      ) : (
+                        <span>REGEN NOW →</span>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             
             {error && (
               <div className="system-error">

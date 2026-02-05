@@ -11,7 +11,7 @@
     align-items: center;
     justify-content: center;
     padding: 2rem;
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary);
 }
 
 /* Header Adjustments */
@@ -66,7 +66,7 @@
 .spinner-ring-spin {
     position: absolute;
     inset: 0;
-    border-top: 4px solid rgb(6, 182, 212);
+    border-top: 4px solid var(--accent-blue);
     border-right: 4px solid transparent;
     border-bottom: 4px solid transparent; /* Make it look like a partial ring */
     border-left: 4px solid transparent;
@@ -82,7 +82,7 @@
     justify-content: center;
     font-size: 1.5rem;
     font-weight: 700;
-    color: rgb(6, 182, 212);
+    color: var(--accent-blue);
 }
 
 .icon-completed-large {
@@ -111,7 +111,7 @@
 
 .active-task-description {
     font-size: 1.1rem;
-    color: rgba(165, 243, 252, 0.8); /* Cyan-200/80 */
+    color: var(--accent-blue);
     margin-bottom: 1.5rem;
     max-width: 28rem;
     margin-left: auto;
@@ -157,7 +157,7 @@
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: rgb(6, 182, 212); /* Cyan-500 */
+    color: var(--accent-blue);
 }
 
 .progress-label-value {
@@ -184,7 +184,7 @@
     text-align: center;
     margin-top: 1.5rem;
     font-size: 0.875rem;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 }
 
 /* Connection Status overrides */
@@ -218,13 +218,13 @@
 
 .disclaimer {
 	font-size: 0.55rem;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	margin-top: 0.2rem;
 }
 
 /* Initializing state */
 .initializing-text {
-	color: var(--text-secondary);
+	color: var(--text-primary);
     font-size: 1.25rem;
 }
 
