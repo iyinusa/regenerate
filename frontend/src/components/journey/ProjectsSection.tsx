@@ -380,13 +380,21 @@ const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                           {project.description?.substring(0, 120)}{project.description?.length > 120 ? '...' : ''}
                         </p>
 
-                        {project.technologies && (
+                        {project.technologies && (Array.isArray(project.technologies) ? project.technologies.length > 0 : !!project.technologies) && (
                           <div className="project-tech">
-                            {project.technologies.slice(0, 4).map((tech: string, i: number) => (
-                              <span key={i} className="tech-badge">{tech}</span>
-                            ))}
-                            {project.technologies.length > 4 && (
-                              <span className="tech-badge">+{project.technologies.length - 4}</span>
+                            {Array.isArray(project.technologies) ? (
+                              <>
+                                {project.technologies.slice(0, 4).map((tech: string, i: number) => (
+                                  <span key={i} className="tech-badge">{tech}</span>
+                                ))}
+                                {project.technologies.length > 4 && (
+                                  <span className="tech-badge">+{project.technologies.length - 4}</span>
+                                )}
+                              </>
+                            ) : (
+                              typeof project.technologies === 'string' ? (
+                                <span className="tech-badge">{project.technologies}</span>
+                              ) : null
                             )}
                           </div>
                         )}

@@ -217,9 +217,13 @@ const ChapterCard: React.FC<{ chapter: any; index: number }> = ({ chapter, index
             <div className="chapter-learnings">
               <div className="learnings-title">Key Learnings:</div>
               <ul>
-                {chapter.key_learnings.map((learning: string, i: number) => (
-                  <li key={i}>{learning}</li>
-                ))}
+                {Array.isArray(chapter.key_learnings) ? (
+                  chapter.key_learnings.map((learning: string, i: number) => (
+                    <li key={i}>{learning}</li>
+                  ))
+                ) : (
+                  typeof chapter.key_learnings === 'string' ? <li>{chapter.key_learnings}</li> : null
+                )}
               </ul>
             </div>
           )}
@@ -269,46 +273,62 @@ const ExperienceCard: React.FC<{ experience: any }> = ({ experience }) => {
         {experience.description || experience.summary}
       </div>
 
-      {experience.highlights && experience.highlights.length > 0 && (
+      {experience.highlights && (Array.isArray(experience.highlights) ? experience.highlights.length > 0 : !!experience.highlights) && (
         <div className="exp-achievements">
           <h4>Key Highlights:</h4>
           <ul>
-            {experience.highlights.map((highlight: string, index: number) => (
-              <li key={index}>{highlight}</li>
-            ))}
+            {Array.isArray(experience.highlights) ? (
+              experience.highlights.map((highlight: string, index: number) => (
+                <li key={index}>{highlight}</li>
+              ))
+            ) : (
+                typeof experience.highlights === 'string' ? <li>{experience.highlights}</li> : null
+            )}
           </ul>
         </div>
       )}
 
       {/* Fallback for old data structure */}
-      {!experience.highlights && experience.achievements && experience.achievements.length > 0 && (
+      {!experience.highlights && experience.achievements && (Array.isArray(experience.achievements) ? experience.achievements.length > 0 : !!experience.achievements) && (
         <div className="exp-achievements">
           <h4>Key Achievements:</h4>
           <ul>
-            {experience.achievements.map((achievement: string, index: number) => (
-              <li key={index}>{achievement}</li>
-            ))}
+            {Array.isArray(experience.achievements) ? (
+              experience.achievements.map((achievement: string, index: number) => (
+                <li key={index}>{achievement}</li>
+              ))
+            ) : (
+                typeof experience.achievements === 'string' ? <li>{experience.achievements}</li> : null
+            )}
           </ul>
         </div>
       )}
 
-      {experience.technologies && experience.technologies.length > 0 && (
+      {experience.technologies && (Array.isArray(experience.technologies) ? experience.technologies.length > 0 : !!experience.technologies) && (
         <div className="exp-technologies">
-          {experience.technologies.map((tech: string, index: number) => (
-            <span key={index} className="tech-tag glass">
-              {tech}
-            </span>
-          ))}
+          {Array.isArray(experience.technologies) ? (
+            experience.technologies.map((tech: string, index: number) => (
+              <span key={index} className="tech-tag glass">
+                {tech}
+              </span>
+            ))
+          ) : (
+             typeof experience.technologies === 'string' ? <span className="tech-tag glass">{experience.technologies}</span> : null
+          )}
         </div>
       )}
 
-      {experience.skills && experience.skills.length > 0 && !experience.technologies && (
+      {experience.skills && (Array.isArray(experience.skills) ? experience.skills.length > 0 : !!experience.skills) && !experience.technologies && (
         <div className="exp-technologies">
-          {experience.skills.map((skill: string, index: number) => (
-            <span key={index} className="tech-tag glass">
-              {skill}
-            </span>
-          ))}
+          {Array.isArray(experience.skills) ? (
+            experience.skills.map((skill: string, index: number) => (
+              <span key={index} className="tech-tag glass">
+                {skill}
+              </span>
+            ))
+          ) : (
+            typeof experience.skills === 'string' ? <span className="tech-tag glass">{experience.skills}</span> : null
+          )}
         </div>
       )}
     </animated.div>

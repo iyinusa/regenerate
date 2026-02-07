@@ -818,7 +818,7 @@ async def get_journey_by_guest_id(
         # Determine profile data part (excluding journey components)
         profile_content = {
             k: v for k, v in structured_data.items() 
-            if k not in ["journey", "timeline", "documentary", "generated_at"]
+            if k not in ["journey", "timeline", "documentary", "generated_at", "passport"]
         } if structured_data else raw_data
         
         # If still no meaningful data, return error
@@ -827,6 +827,8 @@ async def get_journey_by_guest_id(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No profile data available for guest_id: {guest_id}. Profile generation may still be in progress."
             )
+        
+        logger.info(f"Returning journey data - passport: {structured_data.get('passport') is not None}, journey: {bool(structured_data.get('journey'))}, timeline: {bool(structured_data.get('timeline'))}, documentary: {bool(structured_data.get('documentary'))}")
         
         # Return the comprehensive journey data
         return {

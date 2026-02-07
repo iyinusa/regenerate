@@ -882,16 +882,21 @@ function calculateSkillProficiency(
   if (profile?.experiences && Array.isArray(profile.experiences)) {
     profile.experiences.forEach((exp: any) => {
       // Check highlights/responsibilities for skill mentions
+      const highlights = Array.isArray(exp.highlights) ? exp.highlights : (typeof exp.highlights === 'string' ? [exp.highlights] : []);
+      const responsibilities = Array.isArray(exp.responsibilities) ? exp.responsibilities : (typeof exp.responsibilities === 'string' ? [exp.responsibilities] : []);
+
       const textToScan = [
         exp.description,
-        ...(exp.highlights || []),
-        ...(exp.responsibilities || [])
+        ...highlights,
+        ...responsibilities
       ].filter(Boolean).join(' ').toLowerCase();
       
       if (textToScan) {
         Object.keys(skillMetrics).forEach(skillKey => {
           // Count occurrences in experience text
-          const regex = new RegExp(`\\b${skillKey}\\b`, 'gi');
+          // Escape special regex characters to prevent syntax errors (e.g. "c++", ".net")
+          const escapedSkillKey = skillKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedSkillKey}\\b`, 'gi');
           const matches = textToScan.match(regex);
           if (matches) {
             skillMetrics[skillKey].experienceUsage += matches.length;
@@ -919,10 +924,12 @@ function calculateSkillProficiency(
   // Extract skills from education
   if (profile?.education && Array.isArray(profile.education)) {
     profile.education.forEach((edu: any) => {
+      const achievements = Array.isArray(edu.achievements) ? edu.achievements : (typeof edu.achievements === 'string' ? [edu.achievements] : []);
+
       const eduText = [
         edu.field,
         edu.degree,
-        ...(edu.achievements || [])
+        ...achievements
       ].filter(Boolean).join(' ').toLowerCase();
       
       if (eduText) {

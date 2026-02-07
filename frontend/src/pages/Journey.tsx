@@ -147,18 +147,62 @@ const Journey: React.FC = () => {
         if (guestId) {
           // New format: /journey/{guest_id}
           const historyIdParam = searchParams.get('history_id');
+          console.log(`[Journey] Fetching journey for guestId: ${guestId}, historyId: ${historyIdParam}`);
+          
           response = await apiClient.getJourneyByGuestId(guestId, historyIdParam);
+          
+          console.log('[Journey] API response received:', {
+            hasProfile: !!response.profile,
+            hasJourney: !!response.journey,
+            hasTimeline: !!response.timeline,
+            hasDocumentary: !!response.documentary,
+            hasPassport: !!response.passport,
+            historyId: response.history_id
+          });
           
           // Data structure from guest_id endpoint is different
           const profileData = response.profile || null;
+
+          // Helper to ensure lists are actual arrays to prevent crashes
+          const ensureArray = (arr: any) => Array.isArray(arr) ? arr : [];
+
+          // Sanitize profile data
+          if (profileData) {
+            profileData.experiences = ensureArray(profileData.experiences);
+            profileData.education = ensureArray(profileData.education);
+            profileData.skills = ensureArray(profileData.skills);
+            profileData.projects = ensureArray(profileData.projects);
+            profileData.achievements = ensureArray(profileData.achievements);
+            profileData.certifications = ensureArray(profileData.certifications);
+          }
+
           // Inject passport from structured_data if available
           if (profileData && response.passport) {
             profileData._structured_data_passport = response.passport;
           }
           setProfile(profileData);
-          setJourney(response.journey || null);
-          setTimeline(response.timeline || null);
-          setDocumentary(response.documentary || null);
+          
+          const journeyData = response.journey || null;
+          if (journeyData) {
+             journeyData.milestones = ensureArray(journeyData.milestones);
+             journeyData.career_chapters = ensureArray(journeyData.career_chapters);
+             journeyData.skills_evolution = ensureArray(journeyData.skills_evolution);
+          }
+          setJourney(journeyData);
+
+          const timelineData = response.timeline || null;
+          if (timelineData) {
+             timelineData.events = ensureArray(timelineData.events);
+             timelineData.eras = ensureArray(timelineData.eras);
+          }
+          setTimeline(timelineData);
+
+          const documentaryData = response.documentary || null;
+          if (documentaryData) {
+              documentaryData.segments = ensureArray(documentaryData.segments);
+          }
+          setDocumentary(documentaryData);
+          
           setIntroVideo(response.intro_video || null);
           setFullVideo(response.full_video || null);
           setHistoryId(response.history_id || null); // Capture history ID for editing
@@ -187,7 +231,13 @@ const Journey: React.FC = () => {
           }
         }
       } catch (err: any) {
-        console.error('Failed to fetch profile:', err);
+        console.error('[Journey] Failed to fetch profile:', err);
+        console.error('[Journey] Error details:', {
+          message: err.message,
+          stack: err.stack,
+          guestId,
+          username
+        });
         
         // Handle specific error cases
         if (err.message && err.message.includes('404')) {
