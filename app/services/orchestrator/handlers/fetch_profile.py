@@ -21,6 +21,50 @@ logger = logging.getLogger(__name__)
 class FetchProfileHandler(BaseTaskHandler):
     """Handler for profile fetching task."""
     
+    def _is_valid_profile(self, data: Dict[str, Any]) -> bool:
+        """
+        Validate that the extracted data looks like a professional profile.
+        
+        A valid profile must have at least:
+        - A name (required)
+        - Either a title/role OR at least one experience entry
+        
+        Args:
+            data: The extracted profile data
+            
+        Returns:
+            True if the data appears to be a valid profile, False otherwise
+        """
+        if not data:
+            return False
+        
+        # Name is required
+        name = data.get('name', '').strip()
+        if not name or len(name) < 2:
+            return False
+        
+        # Check for title/role
+        title = data.get('title', '').strip()
+        has_title = bool(title and len(title) >= 3)
+        
+        # Check for experiences
+        experiences = data.get('experiences', [])
+        has_experiences = isinstance(experiences, list) and len(experiences) > 0
+        
+        # Check for education
+        education = data.get('education', [])
+        has_education = isinstance(education, list) and len(education) > 0
+        
+        # Check for skills
+        skills = data.get('skills', [])
+        has_skills = isinstance(skills, list) and len(skills) > 0
+        
+        # A valid profile needs name AND at least one of: title, experiences, education, or skills
+        if has_title or has_experiences or has_education or has_skills:
+            return True
+        
+        return False
+    
     async def execute(self, job_id: str, plan: TaskPlan, task: Task) -> Dict[str, Any]:
         """Handle profile fetching task with LinkedIn-aware extraction and resume PDF support."""
         from app.services.linkedin_service import linkedin_service
@@ -153,6 +197,26 @@ class FetchProfileHandler(BaseTaskHandler):
                     for field in ['linkedin', 'github', 'website']:
                         if not result.get(field) and search_result.get(field):
                             result[field] = search_result[field]
+            
+            # Validate that the extracted data looks like a profile
+            if not self._is_valid_profile(result):
+                logger.warning(f"Extracted data does not look like a profile: {result}")
+                raise Exception("The uploaded document does not appear to be a resume or profile. Please upload a valid resume or professional profile.")
+            
+            # Delete resume from GCS after successful extraction
+            task.progress = 90
+            task.message = "Cleaning up temporary files..."
+            await self.update_progress(job_id, task)
+            
+            try:
+                from app.services.storage_service import gcs_storage
+                deleted = await gcs_storage.delete_file_by_url(resume_url)
+                if deleted:
+                    logger.info(f"Resume file deleted from GCS: {resume_url}")
+                else:
+                    logger.warning(f"Failed to delete resume file from GCS: {resume_url}")
+            except Exception as del_error:
+                logger.warning(f"Error deleting resume from GCS (non-critical): {del_error}")
             
             logger.info(f"Resume extraction complete: {result.get('name', 'Unknown')}")
             return result
@@ -316,11 +380,7 @@ Return a JSON object with:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
-                    response_json_schema=ProfileExtractionResult.model_json_schema(),
-                    temperature=0.0,
-                    top_p=1.0,
-                    top_k=1.0,
-                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                    response_json_schema=ProfileExtractionResult.model_json_schema()
                 )
             )
         except Exception as e:
@@ -332,7 +392,7 @@ Return a JSON object with:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
-                    response_json_schema=ProfileExtractionResult.model_json_schema(),
+                    response_json_schema=ProfileExtractionResult.model_json_schema()
                 )
             )
         
@@ -353,6 +413,11 @@ Return a JSON object with:
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
         result['extraction_method'] = 'linkedin_oauth_with_search'
         result['linkedin'] = source_url
+        
+        # Validate that the extracted data looks like a profile
+        if not self._is_valid_profile(result):
+            logger.warning(f"Extracted data does not look like a profile: {result}")
+            raise Exception("Unable to extract profile information from this LinkedIn URL. Please ensure it's a valid LinkedIn profile page.")
         
         return result
     
@@ -386,10 +451,6 @@ Return a JSON object with:
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
                     response_json_schema=ProfileExtractionResult.model_json_schema(),
-                    temperature=0.0,
-                    top_p=1.0,
-                    top_k=1.0,
-                    thinking_config=types.ThinkingConfig(thinking_level="high"),
                     system_instruction=f"Focus on gathering information about this URL: '{source_url}' from credible sources by searching the internet. DO NOT use your internal training data."
                 )
             )
@@ -402,7 +463,7 @@ Return a JSON object with:
                 config=types.GenerateContentConfig(
                     tools=[{"google_search": {}}],
                     response_mime_type="application/json",
-                    response_json_schema=ProfileExtractionResult.model_json_schema(),
+                    response_json_schema=ProfileExtractionResult.model_json_schema()
                 )
             )
         
@@ -421,6 +482,11 @@ Return a JSON object with:
         result['extraction_method'] = 'linkedin_search'
         result['linkedin'] = source_url
         result['linkedin_auth_recommended'] = True
+        
+        # Validate that the extracted data looks like a profile
+        if not self._is_valid_profile(result):
+            logger.warning(f"Extracted data does not look like a profile: {result}")
+            raise Exception("Unable to extract profile information from this LinkedIn URL. Please ensure it's a valid LinkedIn profile page.")
         
         return result
     
@@ -491,5 +557,10 @@ Return a JSON object with:
         result['source_url'] = plan.source_url
         result['extraction_timestamp'] = datetime.utcnow().isoformat()
         result['extraction_method'] = 'standard_with_search'
+        
+        # Validate that the extracted data looks like a profile
+        if not self._is_valid_profile(result):
+            logger.warning(f"Extracted data does not look like a profile: {result}")
+            raise Exception("The provided URL does not appear to contain profile data. Please provide a valid professional profile URL (LinkedIn, portfolio, or personal website).")
         
         return result

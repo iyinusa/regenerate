@@ -111,7 +111,7 @@ class AggregateHistoryHandler(BaseTaskHandler):
                                 contents=enrichment_prompt,
                                 config=types.GenerateContentConfig(
                                     response_mime_type="application/json",
-                                    response_json_schema=ProfileAggregationResult.model_json_schema(),
+                                    response_json_schema=ProfileAggregationResult.model_json_schema()
                                 )
                             )
                         except Exception as e:
@@ -479,13 +479,47 @@ class GenerateDocumentaryHandler(BaseTaskHandler):
         if not self.genai_client:
             raise Exception("Gemini client not initialized")
         
-        journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
-        profile_data = (
-            plan.result_data.get(TaskType.AGGREGATE_HISTORY.value) or 
-            plan.result_data.get(TaskType.ENRICH_PROFILE.value) or 
-            plan.result_data.get(TaskType.FETCH_PROFILE.value) or 
-            {}
-        )
+        # Check if running in standalone mode (compute_documentary_only)
+        is_standalone = plan.options.get("compute_documentary_only", False)
+        current_history_id = plan.options.get('history_id')
+        
+        if is_standalone and current_history_id:
+            # Load profile and journey data from database
+            task.message = "Loading profile data..."
+            task.progress = 25
+            await self.update_progress(job_id, task)
+            
+            journey_data = {}
+            profile_data = {}
+            
+            try:
+                from app.db.session import get_db
+                from app.models.user import ProfileHistory
+                
+                async for db in get_db():
+                    current_history = await db.get(ProfileHistory, current_history_id)
+                    if current_history and current_history.structured_data:
+                        structured = current_history.structured_data
+                        journey_data = structured.get('journey', {})
+                        # Profile data is at the root level of structured_data
+                        profile_data = {k: v for k, v in structured.items() 
+                                       if k not in ['journey', 'timeline', 'documentary', 'generated_at', 'generation_status']}
+                    break
+            except Exception as db_error:
+                logger.error(f"Failed to load profile data: {db_error}")
+                raise Exception(f"Failed to load profile data: {str(db_error)}")
+            
+            if not profile_data.get('name'):
+                raise Exception("No profile data found. Please generate a profile first.")
+        else:
+            # Get data from previous tasks in the pipeline
+            journey_data = plan.result_data.get(TaskType.STRUCTURE_JOURNEY.value, {})
+            profile_data = (
+                plan.result_data.get(TaskType.AGGREGATE_HISTORY.value) or 
+                plan.result_data.get(TaskType.ENRICH_PROFILE.value) or 
+                plan.result_data.get(TaskType.FETCH_PROFILE.value) or 
+                {}
+            )
         
         prompt = get_documentary_narrative_prompt(journey_data, profile_data)
         
@@ -525,12 +559,38 @@ class GenerateDocumentaryHandler(BaseTaskHandler):
             fallback_to_dict=True
         )
         
+        # Validate that segments were generated
+        segments = result.get('segments', [])
+        if not segments or len(segments) == 0:
+            logger.error("Documentary generation returned no segments")
+            raise Exception("Documentary generation failed: No video segments were generated. Please try again.")
+        
+        # Validate each segment has required fields
+        valid_segments = []
+        for seg in segments:
+            if isinstance(seg, dict) and seg.get('visual_description') and seg.get('narration'):
+                valid_segments.append(seg)
+            else:
+                logger.warning(f"Skipping invalid segment: {seg}")
+        
+        if not valid_segments:
+            logger.error("All segments were invalid")
+            raise Exception("Documentary generation failed: No valid video segments with narration and visuals were generated.")
+        
+        result['segments'] = valid_segments
+        logger.info(f"Documentary generated with {len(valid_segments)} valid segments")
+        
+        task.progress = 90
+        task.message = f"Saving documentary ({len(valid_segments)} segments)..."
+        await self.update_progress(job_id, task)
+        
         # Save to database
         current_history_id = plan.options.get('history_id')
         if current_history_id:
             try:
                 from app.db.session import get_db
                 from app.models.user import ProfileHistory
+                from sqlalchemy.orm.attributes import flag_modified
                 
                 async for db in get_db():
                     current_history = await db.get(ProfileHistory, current_history_id)
@@ -542,9 +602,18 @@ class GenerateDocumentaryHandler(BaseTaskHandler):
                         updated_data['documentary'] = result
                         current_history.structured_data = updated_data
                         
+                        # Mark the JSON column as modified so SQLAlchemy detects the change
+                        flag_modified(current_history, 'structured_data')
+                        
                         await db.commit()
+                        logger.info(f"Documentary saved to database for history {current_history_id}")
                     break
             except Exception as db_error:
                 logger.error(f"Failed to save documentary data: {db_error}")
+                raise Exception(f"Failed to save documentary: {str(db_error)}")
+        
+        task.progress = 100
+        task.message = "Documentary complete!"
+        await self.update_progress(job_id, task)
 
         return result

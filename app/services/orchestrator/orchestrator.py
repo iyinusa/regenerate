@@ -118,6 +118,20 @@ class TaskOrchestrator:
             ))
             return tasks
         
+        # Check if this is documentary computation only
+        if options.get("compute_documentary_only"):
+            tasks.append(Task(
+                task_id="task_documentary_gen",
+                task_type=TaskType.GENERATE_DOCUMENTARY,
+                name="Creating Documentary",
+                description="Crafting documentary narrative and video segments",
+                order=1,
+                estimated_seconds=30,
+                critical=True,
+                dependencies=[], 
+            ))
+            return tasks
+        
         # Standard Profile Generation Flow
         
         # Task 1: Fetch Profile

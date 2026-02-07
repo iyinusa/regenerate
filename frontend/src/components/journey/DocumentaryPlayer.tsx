@@ -13,10 +13,11 @@ interface DocumentaryPlayerProps {
     title?: string;
     tagline?: string;
     segments?: any[];
-  };
+  } | null;
   canEdit?: boolean;
   onGenerateVideo?: () => void;
   onRegenerateVideo?: () => void;
+  onDocumentaryComputed?: () => void; // Callback when documentary content is computed
   historyId?: string; // Add historyId prop for video generation
   onRequestAuth?: (action: string, callback: () => void) => void;
 }
@@ -40,6 +41,7 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   canEdit = true,
   onGenerateVideo,
   onRegenerateVideo,
+  onDocumentaryComputed,
   historyId,
   onRequestAuth
 }) => {
@@ -60,10 +62,18 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
   const [generationStatus, setGenerationStatus] = useState<VideoGenerationStatus | null>(null);
   const [errorMessages, setErrorMessages] = useState<ErrorMessage[]>([]);
   
+  // Documentary content computation tracking
+  const [isComputingDocumentary, setIsComputingDocumentary] = useState(false);
+  const [documentaryComputeStatus, setDocumentaryComputeStatus] = useState<VideoGenerationStatus | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const firstFrameLoadedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const documentaryWsRef = useRef<WebSocket | null>(null);
   const errorTimeoutRefs = useRef<Map<string, number>>(new Map());
+
+  // Check if documentary content exists (has segments)
+  const hasDocumentaryContent = documentary?.segments && documentary.segments.length > 0;
 
   // Update edited documentary when documentary prop changes
   useEffect(() => {
@@ -203,11 +213,181 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
     }
   }, [addErrorMessage, onGenerateVideo]);
 
+  // Handle documentary computation status updates
+  const handleDocumentaryComputeUpdate = useCallback((data: any) => {
+    console.log('Documentary compute update:', data);
+
+    // Handle task-level events
+    if (data.event === 'task_started' || data.event === 'task_progress') {
+      if (data.task?.task_type === 'generate_documentary') {
+        setDocumentaryComputeStatus({
+          jobId: data.job_id,
+          status: 'processing',
+          progress: data.task.progress || 0,
+          message: data.task.message || 'Computing documentary...'
+        });
+      }
+    } else if (data.event === 'task_completed') {
+      if (data.task?.task_type === 'generate_documentary') {
+        setDocumentaryComputeStatus({
+          jobId: data.job_id,
+          status: 'processing',
+          progress: 95,
+          message: 'Finalizing documentary...'
+        });
+      }
+    } else if (data.event === 'plan_completed') {
+      // Plan fully completed - documentary is saved
+      setDocumentaryComputeStatus({
+        jobId: data.job_id,
+        status: 'completed',
+        progress: 100,
+        message: 'Documentary content ready!'
+      });
+      
+      // Stop computing state and trigger callback
+      setTimeout(() => {
+        setIsComputingDocumentary(false);
+        setDocumentaryComputeStatus(null);
+        
+        if (onDocumentaryComputed) {
+          onDocumentaryComputed();
+        }
+      }, 1500);
+    } else if (data.event === 'task_failed') {
+      if (data.task?.task_type === 'generate_documentary') {
+        const errorMsg = data.task?.error || 'Documentary computation failed';
+        setDocumentaryComputeStatus({
+          jobId: data.job_id,
+          status: 'failed',
+          progress: 0,
+          message: 'Computation failed',
+          error: errorMsg
+        });
+        
+        addErrorMessage(errorMsg);
+        
+        setTimeout(() => {
+          setIsComputingDocumentary(false);
+          setDocumentaryComputeStatus(null);
+        }, 3000);
+      }
+    } else if (data.event === 'plan_failed') {
+      // Plan failed entirely
+      const errorMsg = data.error || 'Documentary computation failed';
+      setDocumentaryComputeStatus({
+        jobId: data.job_id,
+        status: 'failed',
+        progress: 0,
+        message: 'Computation failed',
+        error: errorMsg
+      });
+      
+      addErrorMessage(errorMsg);
+      
+      setTimeout(() => {
+        setIsComputingDocumentary(false);
+        setDocumentaryComputeStatus(null);
+      }, 3000);
+    }
+  }, [addErrorMessage, onDocumentaryComputed]);
+
+  // Connect to WebSocket for documentary computation updates
+  const connectDocumentaryComputeWebSocket = useCallback((jobId: string) => {
+    if (documentaryWsRef.current) {
+      documentaryWsRef.current.close();
+    }
+
+    try {
+      const ws = new WebSocket(apiClient.getWebSocketUrl(jobId));
+      documentaryWsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('Documentary compute WebSocket connected');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleDocumentaryComputeUpdate(data);
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('Documentary compute WebSocket disconnected');
+      };
+
+      ws.onerror = (error) => {
+        console.error('Documentary compute WebSocket error:', error);
+        addErrorMessage('Connection error during documentary computation');
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      addErrorMessage('Failed to establish real-time connection');
+    }
+  }, [addErrorMessage, handleDocumentaryComputeUpdate]);
+
+  // Trigger documentary content computation
+  const handleComputeDocumentary = async () => {
+    if (!historyId) {
+      addErrorMessage('No history ID available for documentary computation');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      if (onRequestAuth) {
+        onRequestAuth('compute documentary', handleComputeDocumentary);
+      }
+      return;
+    }
+
+    console.log('Computing documentary content...');
+    
+    try {
+      setIsComputingDocumentary(true);
+      setDocumentaryComputeStatus({
+        jobId: 'starting',
+        status: 'processing',
+        progress: 0,
+        message: 'Starting documentary computation...'
+      });
+
+      const result = await apiClient.computeDocumentary(historyId);
+      
+      if (result.job_id) {
+        console.log('Documentary computation started:', result);
+        
+        connectDocumentaryComputeWebSocket(result.job_id);
+        
+        setDocumentaryComputeStatus({
+          jobId: result.job_id,
+          status: 'processing',
+          progress: 5,
+          message: result.message || 'Documentary computation in progress...'
+        });
+      } else {
+        throw new Error('Failed to get job ID from documentary computation request');
+      }
+    } catch (error) {
+      console.error('Failed to start documentary computation:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to start documentary computation';
+      addErrorMessage(errorMsg);
+      
+      setIsComputingDocumentary(false);
+      setDocumentaryComputeStatus(null);
+    }
+  };
+
   // Cleanup WebSocket and timeouts on unmount
   useEffect(() => {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
+      }
+      if (documentaryWsRef.current) {
+        documentaryWsRef.current.close();
       }
       
       // Clear all error timeouts
@@ -470,20 +650,24 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
 
   return (
     <>
-      <DocumentaryEditModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        documentary={editedDocumentary}
-        onSave={handleEditSave}
-      />
+      {editedDocumentary && (
+        <DocumentaryEditModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          documentary={editedDocumentary}
+          onSave={handleEditSave}
+        />
+      )}
 
       {/* Generation Settings Modal */}
-      <VideoGenerationModal
-        isOpen={showGenerationModal}
-        onClose={() => setShowGenerationModal(false)}
-        documentary={editedDocumentary}
-        onGenerate={handleGenerate}
-      />
+      {editedDocumentary && (
+        <VideoGenerationModal
+          isOpen={showGenerationModal}
+          onClose={() => setShowGenerationModal(false)}
+          documentary={editedDocumentary}
+          onGenerate={handleGenerate}
+        />
+      )}
 
       <div 
         className="documentary-player"
@@ -823,25 +1007,85 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
                 🎬
               </motion.div>
               
-              <h3 className="empty-title">Documentary Awaits</h3>
-              <p className="empty-subtitle">Create your cinematic story</p>
-              
-              {canEdit && (
-                <motion.button
-                  className="generate-video-btn"
-                  onClick={() => setShowGenerationModal(true)}
-                  whileHover={{ 
-                    scale: 1.05,
-                    boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <span className="btn-text">Generate Documentary Video</span>
-                  <div className="btn-glow"></div>
-                </motion.button>
+              {!hasDocumentaryContent ? (
+                // No documentary content - show compute button
+                <>
+                  <h3 className="empty-title">Documentary Not Ready</h3>
+                  <p className="empty-subtitle">Generate your documentary narrative and video segments</p>
+                  
+                  {historyId && !isComputingDocumentary && (
+                    <motion.button
+                      className="generate-video-btn"
+                      onClick={canEdit ? handleComputeDocumentary : () => {
+                        if (onRequestAuth) {
+                          onRequestAuth('compute documentary', handleComputeDocumentary);
+                        }
+                      }}
+                      whileHover={{ 
+                        scale: 1.05,
+                        boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <span className="btn-text">Generate Documentary</span>
+                      <div className="btn-glow"></div>
+                    </motion.button>
+                  )}
+                  
+                  {!historyId && (
+                    <p className="empty-hint" style={{ opacity: 0.6, fontSize: '0.85rem', marginTop: '1rem' }}>
+                      No profile history available
+                    </p>
+                  )}
+                  
+                  {isComputingDocumentary && documentaryComputeStatus && (
+                    <div className="computation-status">
+                      <p className="computation-message">
+                        {documentaryComputeStatus.message}
+                      </p>
+                      <div className="computation-progress">
+                        <div className="progress-track">
+                          <motion.div
+                            className="progress-fill"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${documentaryComputeStatus.progress || 0}%` }}
+                            transition={{ duration: 0.5, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <span className="progress-text">
+                          {documentaryComputeStatus.progress || 0}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Has documentary content - show generate video button
+                <>
+                  <h3 className="empty-title">Documentary Awaits</h3>
+                  <p className="empty-subtitle">Create your cinematic story</p>
+                  
+                  {canEdit && (
+                    <motion.button
+                      className="generate-video-btn"
+                      onClick={() => setShowGenerationModal(true)}
+                      whileHover={{ 
+                        scale: 1.05,
+                        boxShadow: "0 0 30px rgba(255, 255, 255, 0.3)"
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <span className="btn-text">Generate Documentary Video</span>
+                      <div className="btn-glow"></div>
+                    </motion.button>
+                  )}
+                </>
               )}
             </div>
             

@@ -233,11 +233,18 @@ npm run build</code></pre>
 
 # Catch-all for frontend routes (SPA routing)
 @app.get("/{path:path}")
-async def serve_frontend_routes(path: str):
+async def serve_frontend_routes(request: Request, path: str):
     """Serve frontend for all other routes - React SPA routing"""
     # Don't intercept API routes
     if path.startswith("api/") or path.startswith("docs") or path.startswith("redoc"):
         return {"detail": "Not found"}
+    
+    # Check if this is a public profile (username route) and serve with SEO meta tags
+    # Username routes don't contain slashes (e.g., /johndoe, not /journey/123)
+    if "/" not in path and not path.startswith("regen") and not path.startswith("journey"):
+        seo_html = await _get_public_profile_seo_html(path, request)
+        if seo_html:
+            return HTMLResponse(seo_html)
     
     # Try to serve the built React app's index.html for client-side routing
     index_file = frontend_dist / "index.html"
@@ -246,6 +253,186 @@ async def serve_frontend_routes(path: str):
     
     # Development fallback
     return await serve_frontend()
+
+
+async def _get_public_profile_seo_html(username: str, request: Request) -> str | None:
+    """Generate HTML with SEO meta tags for public profiles."""
+    from app.db.session import get_db
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.user import User, ProfileHistory
+    from app.models.privacy import ProfilePrivacy
+    
+    try:
+        async for db in get_db():
+            # Find user by username
+            result = await db.execute(
+                select(User)
+                .options(selectinload(User.privacy_settings))
+                .where(User.username == username)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                return None
+            
+            privacy = user.privacy_settings
+            if not privacy or not privacy.is_public:
+                return None
+            
+            # Get latest profile history
+            result = await db.execute(
+                select(ProfileHistory)
+                .where(ProfileHistory.user_id == user.id)
+                .order_by(ProfileHistory.created_at.desc())
+                .limit(1)
+            )
+            history = result.scalar_one_or_none()
+            
+            if not history or not history.structured_data:
+                return None
+            
+            structured_data = history.structured_data
+            
+            # Extract profile info for SEO
+            name = structured_data.get('name', username)
+            title = structured_data.get('title', 'Professional')
+            bio = structured_data.get('bio', structured_data.get('summary', ''))
+            
+            # Get passport image
+            passport_url = structured_data.get('passport', structured_data.get('photo', ''))
+            
+            # Get documentary video
+            documentary = structured_data.get('documentary', {})
+            full_video = history.full_video or ''
+            intro_video = history.intro_video or ''
+            video_url = full_video or intro_video or ''
+            
+            # Build description
+            if bio:
+                description = bio[:200] + '...' if len(bio) > 200 else bio
+            else:
+                description = f"Explore {name}'s professional journey on reGen"
+            
+            # Get the base URL
+            base_url = str(request.base_url).rstrip('/')
+            page_url = f"{base_url}/{username}"
+            
+            # Generate SEO HTML
+            seo_html = _generate_seo_html(
+                title=f"{name} | reGen",
+                description=description,
+                page_url=page_url,
+                image_url=passport_url,
+                video_url=video_url,
+                author_name=name,
+                author_title=title
+            )
+            
+            return seo_html
+            
+    except Exception as e:
+        logger.error(f"Error generating SEO HTML for {username}: {e}")
+        return None
+    
+    return None
+
+
+def _generate_seo_html(
+    title: str,
+    description: str,
+    page_url: str,
+    image_url: str = '',
+    video_url: str = '',
+    author_name: str = '',
+    author_title: str = ''
+) -> str:
+    """Generate an HTML page with proper SEO meta tags that bootstraps the React app."""
+    # Read the original index.html
+    index_file = frontend_dist / "index.html"
+    
+    if index_file.exists():
+        original_html = index_file.read_text()
+        
+        # Build meta tags
+        meta_tags = f'''
+    <title>{title}</title>
+    <meta name="description" content="{description}" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="profile" />
+    <meta property="og:url" content="{page_url}" />
+    <meta property="og:title" content="{title}" />
+    <meta property="og:description" content="{description}" />
+    <meta property="og:site_name" content="reGen" />'''
+        
+        if image_url:
+            meta_tags += f'''
+    <meta property="og:image" content="{image_url}" />
+    <meta property="og:image:alt" content="{author_name}'s profile photo" />'''
+        
+        if video_url:
+            meta_tags += f'''
+    <meta property="og:video" content="{video_url}" />
+    <meta property="og:video:type" content="video/mp4" />
+    <meta property="og:video:width" content="1920" />
+    <meta property="og:video:height" content="1080" />'''
+        
+        # Twitter Card meta tags
+        meta_tags += f'''
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="{'player' if video_url else 'summary_large_image'}" />
+    <meta name="twitter:url" content="{page_url}" />
+    <meta name="twitter:title" content="{title}" />
+    <meta name="twitter:description" content="{description}" />'''
+        
+        if image_url:
+            meta_tags += f'''
+    <meta name="twitter:image" content="{image_url}" />'''
+        
+        if video_url:
+            meta_tags += f'''
+    <meta name="twitter:player" content="{video_url}" />
+    <meta name="twitter:player:width" content="1920" />
+    <meta name="twitter:player:height" content="1080" />'''
+        
+        # Profile-specific meta tags
+        if author_name:
+            meta_tags += f'''
+    
+    <!-- Profile -->
+    <meta property="profile:first_name" content="{author_name.split()[0] if author_name else ''}" />
+    <meta property="profile:username" content="{page_url.split('/')[-1]}" />'''
+        
+        # Inject meta tags by replacing the existing title tag
+        # Find and replace the <title>...</title> in the original HTML
+        import re
+        modified_html = re.sub(
+            r'<title>.*?</title>',
+            meta_tags,
+            original_html,
+            count=1,
+            flags=re.DOTALL
+        )
+        
+        return modified_html
+    
+    # Fallback HTML if index.html doesn't exist
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {meta_tags if 'meta_tags' in dir() else ''}
+    <title>{title}</title>
+    <meta name="description" content="{description}" />
+</head>
+<body>
+    <div id="root"></div>
+    <script>window.location.href = "{page_url}";</script>
+</body>
+</html>'''
 
 if __name__ == "__main__":
     import uvicorn

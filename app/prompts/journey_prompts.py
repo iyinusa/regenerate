@@ -328,47 +328,38 @@ def get_documentary_narrative_prompt(journey_data: Dict[str, Any], profile_data:
 **SEGMENT STRUCTURE:**
 Each segment needs:
 1. **Title** - Segment name
-2. **Duration** - 8 seconds (fixed)
-3. **Visual Description** - What viewers see (REQUIRED for Veo 3.1 generation)
-4. **Narration** - Voiceover script (REQUIRED, 10-15 words max for 8-second segments)
-5. **Mood** - Emotional tone (inspirational, professional, dynamic, reflective, triumphant)
-6. **Background Music Hint** - Music style suggestion
-7. **Data Visualization** - Any charts/graphs to show (type and data_points)
-
-**CRITICAL VEO 3.1 REQUIREMENTS:**
-- Narration MUST be between 10-15 words for 8-second segments
-- Narration MUST be provided (segments without narration will be skipped)
-- Visual Description MUST be provided (segments without visuals will be skipped)
-- Mood helps determine voice quality (warm/uplifting, clear/authoritative, energetic, thoughtful, confident)
+2. **Duration** - 8 seconds
+3. **Visual Description** - What viewers see (for Veo 3.1 generation)
+4. **Narration** - Voiceover script (concise, impactful)
+5. **Mood** - Emotional tone of the segment
+6. **Data Visualization** - Any charts/graphs to show (optional)
 
 **DOCUMENTARY FLOW:**
-1. Opening Hook - Grab attention immediately (120 characters max)
+1. Opening Hook - Grab attention immediately
 2. Origin Story - Where it all began
 3. Journey Highlights - Key milestones and achievements
 4. Challenges & Growth - Obstacles overcome
 5. Impact & Legacy - What they've accomplished
 6. Future Vision - What's next (optional)
-7. Closing Statement - Memorable conclusion (100 characters max)
+7. Closing Statement - Memorable conclusion
 
 **VISUAL DESCRIPTIONS FOR VEO:**
 Be specific about:
-- Camera angles and movements (e.g., "Medium close-up tracking shot", "Wide establishing shot")
-- Color palettes and lighting (e.g., "Cool blue professional lighting", "Warm amber tones")
-- Subject positioning and framing (e.g., "Professional in modern office, centered frame")
-- Data visualizations to render (e.g., "Rising bar chart showing growth metrics")
-- Transitions between segments (e.g., "Fade to black", "Cross-dissolve to next scene")
+- Camera angles and movements
+- Color palettes and lighting
+- Data visualizations to render
+- Transitions between segments
 
-**NARRATION GUIDELINES:**
-- Keep it concise: 10-15 words maximum per 8-second segment
-- Make every word count - avoid filler
-- Use strong, active voice
-- Create emotional connection
-- Build narrative momentum
+**SEGMENT NARRATION FOR VEO:**
+Keep it concise for 8 seconds per segment:
+- Keep sentence length between 10-15 words
+- Must be impactful and engaging
+- Must align with segment title and visual description
 
-**EXAMPLE NARRATION (22 words):**
-"In 2015, Kennedy took his first step into software engineering. What started as curiosity became a career defined by innovation and impact."
+**EXAMPLE NARRATION STYLE:**
+"In 2013, for [First Name], code wasn't just logic, but architecture of a new world"
 
-Return a JSON object with the complete documentary structure."""
+IMPORTANT: Return a JSON object with the complete documentary structure. Documentary must have segments. Each segment MUST have visual_description and narration filled in. Do not return empty segments."""
 
 
 def _format_profile_for_prompt(profile_data: Dict[str, Any]) -> str:

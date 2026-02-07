@@ -401,6 +401,125 @@ async def generate_video(
         )
 
 
+# Track active documentary generation requests to prevent duplicates
+_active_documentary_generations: Dict[str, tuple] = {}
+DOCUMENTARY_GENERATION_COOLDOWN = 30  # seconds before allowing another request
+
+
+@router.post(
+    "/{history_id}/compute-documentary",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Compute Documentary Content",
+    description="Trigger the Task Orchestrator to compute documentary content (narrative and segments) for a profile."
+)
+async def compute_documentary(
+    history_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    """Compute documentary content for a profile history.
+    
+    This endpoint triggers the GENERATE_DOCUMENTARY task in the Task Orchestrator
+    to create the documentary narrative and video segments script based on the
+    existing profile and journey data.
+    
+    This is useful when the documentary wasn't computed during the initial profile
+    generation, or when the user wants to regenerate the documentary content.
+    
+    Args:
+        history_id: ID of the profile history
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        Response with task ID for tracking progress
+    """
+    try:
+        # Check if history exists and belongs to user
+        history = await db.get(ProfileHistory, history_id)
+        if not history:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile history not found: {history_id}"
+            )
+        
+        # Verify ownership
+        if current_user and history.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to generate documentary for this profile"
+            )
+        
+        # Check if profile data exists
+        if not history.structured_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No profile data found. Generate profile first."
+            )
+        
+        # Check for duplicate/rapid requests
+        current_time = time.time()
+        if history_id in _active_documentary_generations:
+            existing_job_id, request_time = _active_documentary_generations[history_id]
+            elapsed = current_time - request_time
+            
+            existing_plan = task_orchestrator.get_plan(existing_job_id)
+            if existing_plan and existing_plan.status.value in ['pending', 'running']:
+                logger.warning(
+                    f"Duplicate documentary generation request for history {history_id} "
+                    f"(existing job: {existing_job_id}, elapsed: {elapsed:.1f}s)"
+                )
+                return {
+                    "job_id": existing_job_id,
+                    "status": "already_processing",
+                    "message": "Documentary computation already in progress"
+                }
+            
+            if elapsed < DOCUMENTARY_GENERATION_COOLDOWN:
+                logger.warning(
+                    f"Documentary generation request within cooldown for history {history_id}"
+                )
+        
+        logger.info(f"Starting documentary computation for history: {history_id}")
+        
+        # Create task orchestrator plan for documentary generation only
+        import uuid
+        job_id = f"doc_{uuid.uuid4().hex[:8]}"
+        
+        plan = task_orchestrator.create_plan(
+            job_id=job_id,
+            source_url=f"history:{history_id}",
+            options={
+                "compute_documentary_only": True,
+                "history_id": history_id,
+                "user_id": history.user_id,
+            }
+        )
+        
+        # Execute plan in background
+        import asyncio
+        asyncio.create_task(task_orchestrator.execute_plan(job_id))
+        
+        # Track this documentary generation request
+        _active_documentary_generations[history_id] = (job_id, time.time())
+        
+        return {
+            "job_id": job_id,
+            "status": "processing",
+            "message": "Documentary computation started"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start documentary computation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start documentary computation: {str(e)}"
+        )
+
+
 @router.get(
     "/status/{job_id}",
     response_model=ProfileStatusResponse,

@@ -247,13 +247,13 @@ class DataVisualization(BaseModel):
 
 class DocumentarySegment(BaseModel):
     """Documentary video segment."""
-    id: Optional[str] = Field(default=None, description="Segment identifier")
-    order: Optional[int] = Field(default=None, description="Segment order")
-    title: Optional[str] = Field(default=None, description="Segment title")
-    duration_seconds: Optional[int] = Field(default=None, description="Duration in seconds (8-30)")
-    visual_description: Optional[str] = Field(default=None, description="What should be shown")
-    narration: Optional[str] = Field(default=None, description="Voiceover script")
-    mood: Optional[DocumentaryMood] = Field(default=None, description="Emotional tone")
+    id: str = Field(..., description="Segment identifier, e.g. segment_1")
+    order: int = Field(..., description="Segment order starting from 1")
+    title: str = Field(..., description="Segment title")
+    duration_seconds: int = Field(default=8, description="Duration in seconds, default 8")
+    visual_description: str = Field(..., description="Detailed description of what should be shown visually")
+    narration: str = Field(..., description="Voiceover script, 10-15 words")
+    mood: DocumentaryMood = Field(default=DocumentaryMood.PROFESSIONAL, description="Emotional tone of the segment")
     background_music_hint: Optional[str] = Field(default=None, description="Music suggestion")
     data_visualization: Optional[DataVisualization] = Field(default=None, description="Data visualization")
 

@@ -266,6 +266,51 @@ class GCSStorageService:
         logger.info(f"Deleted {deleted_count}/{len(filenames)} videos for user {user_id}")
         return deleted_count
 
+    async def delete_file_by_url(self, public_url: str) -> bool:
+        """
+        Delete a file from GCS using its public URL.
+
+        Args:
+            public_url: The full public URL of the file (e.g., https://storage.googleapis.com/bucket/path/file.pdf)
+
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        try:
+            # Extract blob path from public URL
+            # URL format: https://storage.googleapis.com/{bucket_name}/{blob_path}
+            if not public_url:
+                logger.warning("Empty URL provided for deletion")
+                return False
+            
+            # Parse the URL to extract the blob path
+            prefix = f"https://storage.googleapis.com/{self.bucket_name}/"
+            if not public_url.startswith(prefix):
+                logger.warning(f"URL does not match expected bucket format: {public_url}")
+                return False
+            
+            blob_path = public_url[len(prefix):]
+            
+            if not blob_path:
+                logger.warning("Could not extract blob path from URL")
+                return False
+            
+            blob = self.bucket.blob(blob_path)
+            
+            logger.info(f"Deleting file from GCS: {blob_path}")
+            
+            await asyncio.to_thread(blob.delete)
+            
+            logger.info(f"File deleted successfully: {blob_path}")
+            return True
+
+        except GoogleCloudError as e:
+            logger.error(f"Failed to delete file from URL {public_url}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during file deletion: {e}")
+            return False
+
     async def list_user_videos(self, user_id: str) -> List[str]:
         """
         List all videos for a specific user.

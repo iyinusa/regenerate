@@ -116,7 +116,7 @@ class GenerateVideoHandler(BaseTaskHandler):
                 continue
             
             valid_segments += 1
-            seg_id = seg.get("id", f"seg_{i+1:02d}")
+            seg_id = seg.get("id", f"segment_{i+1}")
             
             task.message = f"Generating video segment {valid_segments}..."
             await self.update_progress(job_id, task)

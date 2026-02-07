@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useParams } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api.ts';
 import { useAuth } from '@/hooks/useAuth';
 import JourneyBackground from '@/components/JourneyBackground';
@@ -64,6 +64,7 @@ interface PrivacySettings {
 const Journey: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { guestId, username } = useParams(); // Added username
+  const navigate = useNavigate();
   const { isAuthenticated, guestId: currentUserGuestId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +210,14 @@ const Journey: React.FC = () => {
       }
     };
   }, [searchParams, guestId]);
+
+  // Redirect to homepage if no profile data is available after loading
+  useEffect(() => {
+    if (!loading && !profile && !error) {
+      // No profile data and no error - redirect to homepage
+      navigate('/', { replace: true });
+    }
+  }, [loading, profile, error, navigate]);
 
   const handleAuthRequired = (action?: string) => {
     setAuthMessage(`Please sign in to ${action?.toLowerCase()}`);

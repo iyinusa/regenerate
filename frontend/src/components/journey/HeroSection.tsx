@@ -267,14 +267,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
           >
             <DocumentaryPlayer 
-              documentary={{
+              documentary={documentary ? {
                 ...documentary,
                 intro_url: introVideo,
                 full_video: fullVideo
-              }}
+              } : null}
               historyId={historyId}
               canEdit={canEdit}
               onRequestAuth={onRequestEdit}
+              onDocumentaryComputed={() => {
+                // Refresh the page to load the new documentary
+                window.location.reload();
+              }}
               onGenerateVideo={() => {
                 if (onGenerateVideo) {
                     onGenerateVideo();
