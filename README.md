@@ -1,4 +1,4 @@
-# reGenerate - Your Immersive Cinematic Digital Footprint
+# reGen - Your Immersive Cinematic Digital Footprint
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -8,7 +8,7 @@
 ![Docker](https://img.shields.io/badge/docker-24.0-2496ED.svg)
 ![Gemini 3](https://img.shields.io/badge/AI-Gemini%203-8E44AD.svg)
 
-**reGenerate** transforms your professional history into an immersive, cinematic narrative. It uses state-of-the-art AI to analyze your contributions across platforms (LinkedIn, GitHub, etc.) to tell your story better than a static resume ever could.
+**reGen** transforms your professional history into an immersive, cinematic narrative. It uses state-of-the-art AI to analyze your contributions across platforms (LinkedIn, GitHub, etc.) to tell your story better than a static resume ever could.
 
 ---
 
@@ -18,7 +18,7 @@
 In the fast-paced world of technology and professional growth, we often become so focused on the "now" and "next" that we lose sight of the "past." Meaningful contributions, pivotal project milestones, and crucial skills learned years ago fade from memory. When it's time to update a resume or portfolio, we struggle to recall the depth of our impact, resulting in generic profiles that fail to capture our true journey.
 
 ### The Solution
-**reGenerate** acts as your personal digital biographer. By connecting to your professional accounts (LinkedIn, GitHub, etc.), it uses advanced AI (Google Gemini 3) to:
+**reGen** acts as your personal digital biographer. By connecting to your professional accounts (LinkedIn, GitHub, etc.), it uses advanced AI (Google Gemini 3) to:
 1.  **Analyze** deep historical data and contributions.
 2.  **Structure** your career path into a meaningful timeline.
 3.  **Visualise** your journey using immersive 3D graphics and timelines.
