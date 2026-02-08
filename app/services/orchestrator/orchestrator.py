@@ -114,7 +114,8 @@ class TaskOrchestrator:
                 order=1,
                 estimated_seconds=120,
                 critical=True,
-                dependencies=[], 
+                dependencies=[],
+                max_retries=0,  # No retries for video generation (Veo RPM limit)
             ))
             return tasks
         

@@ -65,7 +65,7 @@ class GenerateVideoHandler(BaseTaskHandler):
         # Check if we should generate only first segment or full segments
         video_settings = plan.options.get('video_settings', {})
         generate_first_only = video_settings.get('first_segment_only', True)
-        resolution = video_settings.get('resolution', '1080p')
+        resolution = video_settings.get('resolution', '720p')
         aspect_ratio = video_settings.get('aspect_ratio', '16:9')
         
         logger.info(f"Video Settings: {resolution} {aspect_ratio}, First Only: {generate_first_only}")
@@ -86,10 +86,13 @@ class GenerateVideoHandler(BaseTaskHandler):
         character_bible = self._build_character_bible(profile_data, journey_data)
         logger.info(f"Generated character bible for {profile_data.get('name', 'subject')}")
         
+        # Extract passport photo if available
+        passport = profile_data.get('passport')
+        
         # Process segments
         generated_segments = []
         segment_urls = []  # Store URLs (GCS or local)
-        video_files = []
+        operations = []  # Store completed operation objects for video extension
         valid_segments = 0
         skipped_segments = 0
         
@@ -103,11 +106,12 @@ class GenerateVideoHandler(BaseTaskHandler):
                 skipped_segments += 1
                 continue
             
-            # Build prompt
+            # Build prompt with passport photo reference
             prompt = build_veo_segment_prompt(
                 segment=seg,
                 character_bible=character_bible,
-                include_character_bible=False
+                include_character_bible=False,
+                passport=passport
             )
             
             if not prompt:
@@ -122,7 +126,16 @@ class GenerateVideoHandler(BaseTaskHandler):
             await self.update_progress(job_id, task)
             
             try:
-                video_ref = video_files[-1] if valid_segments > 1 and video_files else None
+                # Extract video reference from previous completed operation for continuity
+                video_ref = None
+                if valid_segments > 1 and operations:
+                    prev_operation = operations[-1]
+                    # Ensure previous operation is complete and has valid response
+                    if prev_operation.done and prev_operation.response and prev_operation.response.generated_videos:
+                        video_ref = prev_operation.response.generated_videos[0].video
+                        logger.info(f"Using video reference from previous completed operation for segment {valid_segments}")
+                    else:
+                        logger.warning(f"Previous operation not complete or invalid, generating segment {valid_segments} without reference")
                 
                 # Create progress callback
                 async def report_progress(status_msg: str):
@@ -150,17 +163,27 @@ class GenerateVideoHandler(BaseTaskHandler):
                     task.progress = int(base_progress + completed_segments_progress + current_segment_progress)
                     await self.update_progress(job_id, task)
 
-                # Generate segment with user_id for GCS storage
-                url_or_filename, video_object = await video_generator.generate_segment(
+                # Generate segment with user_id for GCS storage (single Veo API call per segment)
+                logger.info(f"Making single Veo API call for segment {seg_id}")
+                url_or_filename, operation = await video_generator.generate_segment(
                     self.genai_client,
                     prompt=prompt,
                     duration_seconds=8,
                     resolution=resolution,
                     aspect_ratio=aspect_ratio,
                     video_reference=video_ref,
-                    user_id=user_id,  # Pass user_id for GCS
+                    user_id=user_id,  # Pass user_id for GCS path: videos/{user_id}/{hash}.mp4
+                    segment_id=seg_id,  # Pass segment_id for deterministic hash naming
                     progress_callback=report_progress
                 )
+                
+                # Validate that operation is complete before proceeding
+                if not operation.done:
+                    raise ValueError(f"Operation returned but not marked as done: {operation.name}")
+                if not operation.response:
+                    raise ValueError(f"Operation complete but response is None: {operation.name}")
+                
+                logger.info(f"Segment {valid_segments} operation complete: {operation.name}")
                 
                 # Determine if it's a GCS URL or local filename
                 if url_or_filename.startswith("https://"):
@@ -169,7 +192,7 @@ class GenerateVideoHandler(BaseTaskHandler):
                     segment_url = video_generator.get_url(url_or_filename)
                 
                 segment_urls.append(url_or_filename)  # Keep original for merging
-                video_files.append(video_object)
+                operations.append(operation)  # Store completed operation for next segment's video reference
                 
                 generated_segments.append({
                     "segment_index": i,
@@ -250,7 +273,7 @@ class GenerateVideoHandler(BaseTaskHandler):
             elif generate_first_only:
                 logger.info(f"Skipped saving to full_video field - only first segment was generated")
         
-        return {
+        result = {
             "video_ready": True,
             "segments_generated": len(generated_segments),
             "full_video_url": final_video_url,
@@ -258,6 +281,26 @@ class GenerateVideoHandler(BaseTaskHandler):
             "segment_urls": [seg["url"] for seg in generated_segments],
             "generated_first_only": generate_first_only
         }
+        
+        # Send WebSocket update to frontend with video URLs
+        if self.broadcast_callback:
+            update_data = {
+                "intro_video": intro_video_url,
+                "video_ready": True,
+                "segments_generated": len(generated_segments)
+            }
+            
+            # Only include full_video if it was generated
+            if final_video_url:
+                update_data["full_video"] = final_video_url
+                logger.info(f"Broadcasting full documentary video URL to frontend: {final_video_url}")
+            else:
+                logger.info(f"Broadcasting intro video URL to frontend: {intro_video_url}")
+            
+            # Broadcast video URLs to frontend via WebSocket
+            await self.broadcast_callback(job_id, "video_urls_updated", update_data)
+        
+        return result
     
     async def _load_journey_data(self, plan: TaskPlan, current_history_id: str) -> Dict[str, Any]:
         """Load journey data from plan or database."""

@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Google Cloud Storage Bucket Setup Script for reGen
-# This script creates and configures a GCS bucket for storing documentary videos
+# This script creates and configures a GCS bucket for storing documentary assets
 
 set -e  # Exit on error
 
 # Configuration
 PROJECT_ID="${GCP_PROJECT_ID}"
-BUCKET_NAME="regen_videos"
+BUCKET_NAME="regen_assets"
 REGION="us-central1"
 STORAGE_CLASS="STANDARD"
 
@@ -76,18 +76,18 @@ echo -e "${GREEN}✓ CORS configuration applied${NC}"
 
 # Set bucket permissions for public read (optional)
 echo -e "${GREEN}Step 3: Setting bucket permissions...${NC}"
-read -p "Do you want to make videos publicly accessible? (y/n): " -n 1 -r
+read -p "Do you want to make assets publicly accessible? (y/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     gsutil iam ch allUsers:objectViewer gs://${BUCKET_NAME}
     echo -e "${GREEN}✓ Bucket set to public read${NC}"
 else
-    echo -e "${YELLOW}Skipping public access. Videos will require signed URLs.${NC}"
+    echo -e "${YELLOW}Skipping public access. Assets will require signed URLs.${NC}"
 fi
 
 # Create folder structure
 echo -e "${GREEN}Step 4: Creating folder structure...${NC}"
-echo "" | gsutil cp - gs://${BUCKET_NAME}/videos/.keep
+echo "" | gsutil cp - gs://${BUCKET_NAME}/assets/.keep
 echo -e "${GREEN}✓ Folder structure created${NC}"
 
 # Verify setup

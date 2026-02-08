@@ -4,6 +4,7 @@ import logging
 import uuid
 import base64
 import time
+import hashlib
 from typing import List, Optional, Tuple, Any, Callable, Awaitable
 from pathlib import Path
 
@@ -90,6 +91,7 @@ class VideoGenerator:
         resolution: str = "720p",
         video_reference: Optional[Any] = None,
         user_id: Optional[str] = None,
+        segment_id: Optional[str] = None,
         progress_callback: Optional[Callable[[str], Awaitable[None]]] = None
     ) -> Tuple[str, Any]:
         """
@@ -101,12 +103,14 @@ class VideoGenerator:
             duration_seconds: Duration in seconds (1-10)
             aspect_ratio: Video aspect ratio
             resolution: Video resolution
-            video_reference: Previous video object for continuity
+            video_reference: Previous video object for continuity (extract from completed operation)
             user_id: User ID for GCS organization (optional)
+            segment_id: Optional segment identifier for deterministic naming
             progress_callback: Optional async callback for status updates
             
         Returns:
-            Tuple of (url_or_filename, video_object) for continuity.
+            Tuple of (url_or_filename, completed_operation) for video extension.
+            The operation object is fully completed and refreshed, ready for extracting video reference.
         """
         try:
             logger.info(f"Generating video segment ({duration_seconds}s) with prompt: {prompt[:100]}...")
@@ -181,7 +185,7 @@ class VideoGenerator:
                     await progress_callback(f"Generating segment... ({poll_count * 10}s elapsed)")
                 
                 await asyncio.sleep(10)
-                # Pass the operation object itself, not operation.name
+                # Refresh the operation object to get latest status
                 operation = await asyncio.to_thread(
                     client.operations.get,
                     operation
@@ -193,6 +197,11 @@ class VideoGenerator:
             if not operation.done:
                 raise TimeoutError(f"Video generation timed out after {max_polls * 10} seconds")
             
+            # Ensure operation is complete and has valid response
+            logger.info(f"Operation completed: {operation.name}")
+            if not operation.response:
+                raise ValueError(f"Operation completed but response is None: {operation.name}")
+            
             # Get the generated video
             if not operation.response or not operation.response.generated_videos:
                 raise ValueError("No video generated from Gemini API")
@@ -200,9 +209,17 @@ class VideoGenerator:
             generated_video = operation.response.generated_videos[0]
             logger.info(f"Generated video received: {type(generated_video)}")
             
-            # Save to file
-            filename = f"segment_{uuid.uuid4().hex[:8]}.mp4"
+            # Generate deterministic filename using segment_id or prompt hash
+            if segment_id:
+                # Use provided segment_id for deterministic naming
+                segment_hash = hashlib.md5(f"{segment_id}_{prompt[:100]}".encode()).hexdigest()[:12]
+            else:
+                # Fall back to prompt-based hash
+                segment_hash = hashlib.md5(prompt.encode()).hexdigest()[:12]
+            
+            filename = f"{segment_hash}.mp4"
             filepath = self.output_dir / filename
+            logger.info(f"Using segment hash: {segment_hash} for filename")
             
             # Download and save the video following Gemini Veo API documentation
             try:
@@ -245,21 +262,28 @@ class VideoGenerator:
                             content_type="video/mp4",
                             make_public=True
                         )
-                        logger.info(f"Video uploaded to GCS: {public_url}")
+                        logger.info(f"✓ Video uploaded to GCS: {public_url}")
                         
-                        # Optionally clean up local file after successful GCS upload
+                        # Clean up local file after successful GCS upload
                         await asyncio.to_thread(filepath.unlink)
-                        logger.info(f"Local temp file removed: {filepath}")
+                        logger.info(f"✓ Local temp file removed: {filepath}")
                         
-                        return public_url, video_file
+                        # Return URL and completed operation for video extension
+                        return public_url, operation
                         
                     except Exception as gcs_error:
-                        logger.error(f"GCS upload failed, falling back to local: {gcs_error}")
+                        logger.error(f"✗ GCS upload failed, falling back to local storage: {gcs_error}")
                         # Fall back to local storage
-                        return filename, video_file
+                        return filename, operation
+                elif not self.use_gcs:
+                    logger.warning("✗ GCS is disabled, using local storage")
+                    return filename, operation
+                elif not user_id:
+                    logger.warning("✗ No user_id provided, using local storage")
+                    return filename, operation
                 
-                # Return filename and the video object for continuity reference
-                return filename, video_file
+                # Return filename and the completed operation for video extension
+                return filename, operation
                 
             except Exception as save_error:
                 logger.error(f"Failed to download/save video: {save_error}")

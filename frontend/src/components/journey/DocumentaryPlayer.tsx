@@ -169,6 +169,35 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
           message: data.task.message || 'Generating video...'
         });
       }
+    } else if (data.event === 'video_urls_updated') {
+      // Handle video URLs update from backend
+      // Data comes wrapped in data.data from orchestrator
+      const videoData = data.data || data;
+      console.log('✓ Video URLs received from backend:', videoData);
+      
+      if (videoData.intro_video) {
+        // Update documentary with new intro video
+        setEditedDocumentary(prev => prev ? {
+          ...prev,
+          intro_url: videoData.intro_video
+        } : null);
+        console.log('✓ Updated intro video:', videoData.intro_video);
+      }
+      
+      if (videoData.full_video) {
+        // Update documentary with full video
+        setEditedDocumentary(prev => prev ? {
+          ...prev,
+          full_video: videoData.full_video
+        } : null);
+        console.log('✓ Updated full video:', videoData.full_video);
+      }
+      
+      // Refresh the page to show the updated video
+      setTimeout(() => {
+        console.log('Refreshing page to load new video...');
+        window.location.reload();
+      }, 1500);
     } else if (data.event === 'task_completed') {
       if (data.task?.task_type === 'generate_video') {
         setGenerationStatus({
@@ -184,7 +213,8 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
           setGenerationStatus(null);
           
           // Call the appropriate callback based on whether this was a regeneration
-          if (isFullVideo && onRegenerateVideo) {
+          const hasFullVideo = !!documentary?.full_video;
+          if (hasFullVideo && onRegenerateVideo) {
             onRegenerateVideo();
           } else if (onGenerateVideo) {
             onGenerateVideo();
@@ -211,7 +241,7 @@ const DocumentaryPlayer: React.FC<DocumentaryPlayerProps> = ({
         }, 3000);
       }
     }
-  }, [addErrorMessage, onGenerateVideo]);
+  }, [addErrorMessage, onGenerateVideo, onRegenerateVideo, documentary]);
 
   // Handle documentary computation status updates
   const handleDocumentaryComputeUpdate = useCallback((data: any) => {

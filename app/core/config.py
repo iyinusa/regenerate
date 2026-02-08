@@ -114,8 +114,8 @@ class Settings(BaseSettings):
     
     # Google Cloud Storage settings
     gcs_bucket_name: str = Field(
-        default="regen_videos",
-        description="Google Cloud Storage bucket name for videos"
+        default="regen_assets",
+        description="Google Cloud Storage bucket name for assets"
     )
     gcp_project_id: str = Field(
         default="",

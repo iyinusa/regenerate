@@ -32,7 +32,7 @@ class GCSStorageService:
             project_id: GCP project ID (default from env: GCP_PROJECT_ID)
             credentials_path: Path to service account JSON (default from env: GOOGLE_APPLICATION_CREDENTIALS)
         """
-        self.bucket_name = bucket_name or os.getenv("GCS_BUCKET_NAME", "regen_videos")
+        self.bucket_name = bucket_name or os.getenv("GCS_BUCKET_NAME", "regen_assets")
         self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
         
         # Set credentials if provided
@@ -59,6 +59,19 @@ class GCSStorageService:
             Full blob path in format: images/{user_id}/{filename}
         """
         return f"images/{user_id}/{filename}"
+
+    def _get_blob_path(self, user_id: str, filename: str) -> str:
+        """
+        Generate the GCS blob path for a video file.
+
+        Args:
+            user_id: User or guest ID
+            filename: Name of the video file
+
+        Returns:
+            Full blob path in format: videos/{user_id}/{filename}
+        """
+        return f"videos/{user_id}/{filename}"
 
     async def upload_file_object(
         self,

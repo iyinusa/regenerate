@@ -69,7 +69,8 @@ AUDIO RULES:
 def build_veo_segment_prompt(
     segment: Dict[str, Any],
     character_bible: str = None,
-    include_character_bible: bool = True
+    include_character_bible: bool = True,
+    passport: str = None
 ) -> str:
     """Build a Veo 3.1 optimized prompt for a single segment.
     
@@ -83,6 +84,7 @@ def build_veo_segment_prompt(
         segment: Documentary segment data
         character_bible: Character bible for continuity (optional)
         include_character_bible: Whether to include the character bible in prompt
+        passport: User's passport photo URL for character reference (optional)
         
     Returns:
         Formatted Veo prompt string
@@ -165,6 +167,17 @@ def build_veo_segment_prompt(
         "lighting": "cool-toned, professional"
     }
     
+    # Add passport photo reference if provided and valid
+    # Skip if passport is null, empty, or a default avatar (data:image/svg)
+    if passport and isinstance(passport, str) and not passport.startswith("data:image/svg"):
+        segment_data["visuals"]["reference_image"] = passport
+        segment_data["visuals"]["instructions"] = [
+            "When depicting a person or character in the scene, use the individual from the provided reference image",
+            "Maintain the exact skin tone, facial features, and overall appearance of the person in the reference image",
+            "Ensure consistency of the person's likeness throughout the video segment",
+            "Do not generate random faces - always use the reference image when a person needs to be shown"
+        ]
+    
     # Convert to JSON string with proper formatting
     segment_prompt = json.dumps(segment_data, indent=2)
     
@@ -232,6 +245,12 @@ CHARACTER CONTINUITY:
 - Include name, demeanor, and cinematographic style
 - Maintain visual consistency (silhouettes, build, profile)
 - Keep voice characteristics consistent
+
+PASSPORT PHOTO REFERENCE:
+- If a user's passport photo is provided (and not a default avatar), it will be used as a reference
+- Veo will use the person's actual appearance instead of generating random faces
+- Maintains skin tone, facial features, and overall likeness throughout the video
+- Ensures authentic representation in documentary-style videos
 
 CINEMATOGRAPHIC STYLES BY INDUSTRY:
 - Tech/Software: Cool blues, minimalist digital overlays
