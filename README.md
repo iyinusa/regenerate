@@ -73,9 +73,9 @@ regenerate/
 │   ├── api/             # API routes and controllers
 │   ├── core/            # Config, security, and logging
 │   ├── db/              # Database models and session management
-│   ├── services/        # Business logic (AI, LinkedIn, Video gen)
+│   ├── services/        # Business logic (AI, GitHub, LinkedIn, Video gen)
 │   └── schemas/         # Pydantic models for data validation
-├── frontend/            # Frontend React application
+├── frontend/            # Frontend React/ThreeJS application
 │   ├── src/             # Source code (components, pages, hooks)
 │   └── public/          # Static assets
 ├── alembic/             # Database migrations
