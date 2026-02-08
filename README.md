@@ -26,6 +26,8 @@ In the fast-paced world of technology and professional growth, we often become s
 
 It's not just a profile; it's a celebration of your career.
 
+![alt text](reGen.gif)
+
 ---
 
 ## ✨ Key Features
