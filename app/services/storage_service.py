@@ -30,14 +30,14 @@ class GCSStorageService:
         Args:
             bucket_name: Name of the GCS bucket (default from env: GCS_BUCKET_NAME)
             project_id: GCP project ID (default from env: GCP_PROJECT_ID)
-            credentials_path: Path to service account JSON (default from env: GOOGLE_APPLICATION_CREDENTIALS)
+            credentials_path: Path to service account JSON (default from env: GOOGLE_APPLICATION_CREDENTIAL)
         """
         self.bucket_name = bucket_name or os.getenv("GCS_BUCKET_NAME", "regen_assets")
         self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
         
         # Set credentials if provided
         if credentials_path:
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+            os.environ["GOOGLE_APPLICATION_CREDENTIAL"] = credentials_path
         
         try:
             self.client = storage.Client(project=self.project_id)
