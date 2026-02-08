@@ -121,7 +121,7 @@ class Settings(BaseSettings):
         default="",
         description="Google Cloud Platform project ID"
     )
-    google_application_credentials: str = Field(
+    google_application_credential: str = Field(
         default="",
         description="Path to GCP service account JSON credentials file"
     )
