@@ -12,6 +12,13 @@ class ProfileStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    RESTRICTED = "restricted"  # For VIDEO_PROCESSING permission restrictions
+
+
+class ProfileSourceType(str, Enum):
+    """Profile source type."""
+    URL = "url"
+    RESUME = "resume"
 
 
 class TaskStatus(str, Enum):
@@ -42,23 +49,11 @@ class TaskInfo(BaseModel):
     critical: bool = True
 
 
-class ProfileSourceType(str, Enum):
-    """Type of profile source."""
-    URL = "url"
-    RESUME = "resume"
-
-
 class ProfileGenerateRequest(BaseModel):
     """Request schema for profile generation."""
-    source_type: ProfileSourceType = Field(
-        default=ProfileSourceType.URL,
-        description="Type of profile source: 'url' for links or 'resume' for PDF uploads"
-    )
-    url: Optional[str] = Field(None, description="Profile URL to analyze (LinkedIn, website, etc.)")
-    resume_file_url: Optional[str] = Field(
-        None, 
-        description="GCS URL of uploaded resume PDF (when source_type is 'resume')"
-    )
+    source_type: ProfileSourceType = Field(..., description="Source type: 'url' for LinkedIn/web profiles or 'resume' for PDF resumes")
+    url: Optional[str] = Field(default=None, description="Profile URL to analyze (LinkedIn, website, etc.) - Required when source_type is 'url'")
+    resume_file_url: Optional[str] = Field(default=None, description="GCS URL of uploaded resume PDF - Required when source_type is 'resume'")
     include_github: bool = Field(default=False, description="Whether to include GitHub OAuth data")
     guest_user_id: str = Field(..., description="Unique guest user ID from frontend")
     
@@ -67,6 +62,7 @@ class ProfileGenerateRequest(BaseModel):
             "example": {
                 "source_type": "url",
                 "url": "https://linkedin.com/in/iyinusa",
+                "resume_file_url": None,
                 "include_github": False,
                 "guest_user_id": "550e8400-e29b-41d4-a716-446655440000"
             }
