@@ -5,6 +5,7 @@ This module exports all schemas including Gemini AI structured output schemas.
 
 from app.schemas.profile import (
     ProfileStatus,
+    ProfileSourceType,
     TaskStatus,
     TaskInfo,
     ProfileGenerateRequest,
